@@ -2,8 +2,6 @@
 //  MacroTrackerApp.swift
 //  MacroTracker
 //
-//  Created by Adrian Dawn on 23/03/2026.
-//
 
 import SwiftUI
 import SwiftData
@@ -12,7 +10,10 @@ import SwiftData
 struct MacroTrackerApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            UserProfile.self,
+            FoodItem.self,
+            DailyEntry.self,
+            DailyHistory.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
