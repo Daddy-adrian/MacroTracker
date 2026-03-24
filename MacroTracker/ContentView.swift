@@ -580,6 +580,21 @@ struct HomeView: View {
     var carbsPct: Double { totalMacros > 0 ? (consumedCarbs / totalMacros) * 100 : 0 }
     var fatPct: Double { totalMacros > 0 ? (consumedFat / totalMacros) * 100 : 0 }
     
+    // Time-based sedentary calories burned up to the current moment in the day
+    var sedentaryBurnedSoFar: Double {
+        let sedentaryTDEE = profile.bmr * 1.2
+        let now = Date()
+        let startOfDay = Calendar.current.startOfDay(for: now)
+        let secondsPassed = now.timeIntervalSince(startOfDay)
+        let fractionOfDay = secondsPassed / (24 * 60 * 60)
+        return sedentaryTDEE * fractionOfDay
+    }
+    
+    // Ongoing Caloric Status Formula
+    var currentCalorieBalance: Double {
+        return consumedCalories - (sedentaryBurnedSoFar + healthManager.dailyActiveCalories)
+    }
+    
     var searchResults: [FoodItem] {
         let baseItems = foodDatabase.filter { food in
             if food.dailyGoalAmount <= 0 { return true }
@@ -602,6 +617,77 @@ struct HomeView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
+                    
+                    // Real-Time Calorie Status Hero
+                    let balance = currentCalorieBalance
+                    
+                    VStack(spacing: 8) {
+                        Text("Current Balance")
+                            .font(.headline)
+                            .foregroundColor(Color.pastelTextMuted)
+                        
+                        Text(String(format: "%+d kcal", Int(balance)))
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
+                            .foregroundColor(balance > 0 ? Color.macroProteinText : Color.macroCaloriesText)
+                        
+                        Text(balance > 0 ? "You are currently in a surplus." : "You are currently in a deficit.")
+                            .font(.subheadline)
+                            .foregroundColor(Color.pastelTextMuted)
+                    }
+                    .padding(.top, 10)
+                    
+                    // HealthKit Activity Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Today's Activity")
+                                .font(.headline.bold())
+                                .foregroundColor(Color.pastelText)
+                            Spacer()
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(Color.macroProtein)
+                        }
+                        
+                        HStack(spacing: 16) {
+                            // Steps Card
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Image(systemName: "figure.walk")
+                                        .foregroundColor(Color.pastelText)
+                                    Text("Steps")
+                                        .font(.caption)
+                                        .foregroundColor(Color.pastelTextMuted)
+                                }
+                                Text("\(Int(healthManager.dailySteps))")
+                                    .font(.title2.bold())
+                                    .foregroundColor(Color.pastelText)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.pastelCard)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
+                            
+                            // Active Energy Card
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Image(systemName: "flame.fill")
+                                        .foregroundColor(Color.macroFats)
+                                    Text("Burned")
+                                        .font(.caption)
+                                        .foregroundColor(Color.pastelTextMuted)
+                                }
+                                Text("\(Int(healthManager.dailyActiveCalories)) kcal")
+                                    .font(.title2.bold())
+                                    .foregroundColor(Color.pastelText)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.pastelCard)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
+                        }
+                    }
+                    .padding(.horizontal)
                     
                     // Progress Dashboard
                     VStack(spacing: 16) {
@@ -666,58 +752,7 @@ struct HomeView: View {
                     .softCardStyle()
                     .padding(.horizontal)
                     
-                    // HealthKit Activity Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Today's Activity")
-                                .font(.headline.bold())
-                                .foregroundColor(Color.pastelText)
-                            Spacer()
-                            Image(systemName: "heart.fill")
-                                .foregroundColor(Color.macroProtein)
-                        }
-                        
-                        HStack(spacing: 16) {
-                            // Steps Card
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Image(systemName: "figure.walk")
-                                        .foregroundColor(Color.pastelText)
-                                    Text("Steps")
-                                        .font(.caption)
-                                        .foregroundColor(Color.pastelTextMuted)
-                                }
-                                Text("\(Int(healthManager.dailySteps))")
-                                    .font(.title2.bold())
-                                    .foregroundColor(Color.pastelText)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.pastelCard)
-                            .cornerRadius(12)
-                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
-                            
-                            // Active Energy Card
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Image(systemName: "flame.fill")
-                                        .foregroundColor(Color.macroFats)
-                                    Text("Burned")
-                                        .font(.caption)
-                                        .foregroundColor(Color.pastelTextMuted)
-                                }
-                                Text("\(Int(healthManager.dailyActiveCalories)) kcal")
-                                    .font(.title2.bold())
-                                    .foregroundColor(Color.pastelText)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.pastelCard)
-                            .cornerRadius(12)
-                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
-                        }
-                    }
-                    .padding(.horizontal)
+                    // End of Dashboard Modules
                     
                     // Daily Goals section
                     if !goalFoods.isEmpty {
