@@ -15,12 +15,16 @@ final class UserProfile {
     var goal: String // "cut", "maintain", "mass"
     var activityLevel: Double // 1.2 to 1.9
 
+    // New properties
+    var smartNotificationsEnabled: Bool = false
+    var usualWorkoutTime: Date?
+
     // Calculated Targets
     var bmr: Double
     var targetCalories: Double
     var targetProtein: Double
     
-    init(weightKg: Double, heightCm: Double, age: Int, isMale: Bool = true, goal: String, activityLevel: Double, targetCalories: Double, targetProtein: Double) {
+    init(weightKg: Double, heightCm: Double, age: Int, isMale: Bool = true, goal: String, activityLevel: Double, targetCalories: Double, targetProtein: Double, smartNotificationsEnabled: Bool = false, usualWorkoutTime: Date? = nil) {
         self.weightKg = weightKg
         self.heightCm = heightCm
         self.age = age
@@ -36,6 +40,9 @@ final class UserProfile {
         
         self.targetCalories = targetCalories
         self.targetProtein = targetProtein
+        
+        self.smartNotificationsEnabled = smartNotificationsEnabled
+        self.usualWorkoutTime = usualWorkoutTime
     }
 }
 
@@ -112,5 +119,16 @@ final class DailyHistory {
         self.totalFat = totalFat
         self.totalFiber = totalFiber
         self.containsAdHoc = containsAdHoc
+    }
+}
+
+@Model
+final class WorkoutEntry {
+    var timestamp: Date
+    var caloriesBurned: Double
+    
+    init(timestamp: Date = Date(), caloriesBurned: Double = 250.0) {
+        self.timestamp = timestamp
+        self.caloriesBurned = caloriesBurned
     }
 }

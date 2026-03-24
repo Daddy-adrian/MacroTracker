@@ -13,7 +13,8 @@ struct MacroTrackerApp: App {
             UserProfile.self,
             FoodItem.self,
             DailyEntry.self,
-            DailyHistory.self
+            DailyHistory.self,
+            WorkoutEntry.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -113,6 +113,11 @@ struct MainTabView: View {
                     Label("Dashboard", systemImage: "chart.pie.fill")
                 }
             
+            CalorieCalculatorView(profile: profile)
+                .tabItem {
+                    Label("Calculator", systemImage: "flame.fill")
+                }
+            
             FoodDatabaseView()
                 .tabItem {
                     Label("My Foods", systemImage: "list.bullet.clipboard")
@@ -159,6 +164,7 @@ struct SettingsWrapperView: View {
             try modelContext.delete(model: FoodItem.self)
             try modelContext.delete(model: DailyEntry.self)
             try modelContext.delete(model: DailyHistory.self)
+            try modelContext.delete(model: WorkoutEntry.self)
             try modelContext.save()
         } catch {}
     }
@@ -188,6 +194,9 @@ struct SetupView: View {
     @State private var manualProtein: Double = 0
     @State private var hasEditedSliders = false
     @State private var showingSavedAlert = false
+    
+    @State private var smartNotificationsEnabled = false
+    @State private var usualWorkoutTime = Calendar.current.date(bySettingHour: 20, minute: 0, second: 0, of: Date()) ?? Date()
     
     var weight: Double { Double(weightStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
     var height: Double { Double(heightStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
@@ -273,6 +282,13 @@ struct SetupView: View {
                 }
             }
             
+            Section(header: Text("Smart Reminders (Water, Food, Pre-Workout)")) {
+                Toggle("Enable Smart Reminders", isOn: $smartNotificationsEnabled)
+                if smartNotificationsEnabled {
+                    DatePicker("Usual Workout Time", selection: $usualWorkoutTime, displayedComponents: .hourAndMinute)
+                }
+            }
+            
             if isFormValid {
                 Section(header: Text("Calculations")) {
                     HStack { Text("BMR"); Spacer(); Text("\(Int(bmr)) kcal") }
@@ -349,6 +365,10 @@ struct SetupView: View {
             activityLevel = profile.activityLevel
             manualCalories = profile.targetCalories
             manualProtein = profile.targetProtein
+            smartNotificationsEnabled = profile.smartNotificationsEnabled
+            if let wTime = profile.usualWorkoutTime {
+                usualWorkoutTime = wTime
+            }
             hasEditedSliders = true
         }
     }
@@ -363,6 +383,8 @@ struct SetupView: View {
             profile.activityLevel = activityLevel
             profile.targetCalories = displayCalories
             profile.targetProtein = displayProtein
+            profile.smartNotificationsEnabled = smartNotificationsEnabled
+            profile.usualWorkoutTime = usualWorkoutTime
         } else {
             let profile = UserProfile(
                 weightKg: weight,
@@ -372,11 +394,22 @@ struct SetupView: View {
                 goal: goal,
                 activityLevel: activityLevel,
                 targetCalories: displayCalories,
-                targetProtein: displayProtein
+                targetProtein: displayProtein,
+                smartNotificationsEnabled: smartNotificationsEnabled,
+                usualWorkoutTime: usualWorkoutTime
             )
             modelContext.insert(profile)
         }
         try? modelContext.save()
+        
+        if smartNotificationsEnabled {
+            NotificationManager.shared.requestAuthorization()
+            NotificationManager.shared.scheduleWaterReminders()
+            NotificationManager.shared.schedulePreWorkoutReminder(for: usualWorkoutTime)
+            NotificationManager.shared.resetInactivityReminder()
+        } else {
+            NotificationManager.shared.removeAllScheduledNotifications()
+        }
     }
 }
 
@@ -548,7 +581,6 @@ struct FoodMenuEntryView: View {
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     var profile: UserProfile
-    @StateObject private var healthManager = HealthManager()
     
     @Query(sort: \DailyEntry.timestamp, order: .reverse) private var allEntries: [DailyEntry]
     @Query(sort: \FoodItem.name) private var foodDatabase: [FoodItem]
@@ -580,21 +612,6 @@ struct HomeView: View {
     var carbsPct: Double { totalMacros > 0 ? (consumedCarbs / totalMacros) * 100 : 0 }
     var fatPct: Double { totalMacros > 0 ? (consumedFat / totalMacros) * 100 : 0 }
     
-    // Time-based sedentary calories burned up to the current moment in the day
-    var sedentaryBurnedSoFar: Double {
-        let sedentaryTDEE = profile.bmr * 1.2
-        let now = Date()
-        let startOfDay = Calendar.current.startOfDay(for: now)
-        let secondsPassed = now.timeIntervalSince(startOfDay)
-        let fractionOfDay = secondsPassed / (24 * 60 * 60)
-        return sedentaryTDEE * fractionOfDay
-    }
-    
-    // Ongoing Caloric Status Formula
-    var currentCalorieBalance: Double {
-        return consumedCalories - (sedentaryBurnedSoFar + healthManager.dailyActiveCalories)
-    }
-    
     var searchResults: [FoodItem] {
         let baseItems = foodDatabase.filter { food in
             if food.dailyGoalAmount <= 0 { return true }
@@ -617,77 +634,6 @@ struct HomeView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    
-                    // Real-Time Calorie Status Hero
-                    let balance = currentCalorieBalance
-                    
-                    VStack(spacing: 8) {
-                        Text("Current Balance")
-                            .font(.headline)
-                            .foregroundColor(Color.pastelTextMuted)
-                        
-                        Text(String(format: "%+d kcal", Int(balance)))
-                            .font(.system(size: 40, weight: .bold, design: .rounded))
-                            .foregroundColor(balance > 0 ? Color.macroProteinText : Color.macroCaloriesText)
-                        
-                        Text(balance > 0 ? "You are currently in a surplus." : "You are currently in a deficit.")
-                            .font(.subheadline)
-                            .foregroundColor(Color.pastelTextMuted)
-                    }
-                    .padding(.top, 10)
-                    
-                    // HealthKit Activity Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Today's Activity")
-                                .font(.headline.bold())
-                                .foregroundColor(Color.pastelText)
-                            Spacer()
-                            Image(systemName: "heart.fill")
-                                .foregroundColor(Color.macroProtein)
-                        }
-                        
-                        HStack(spacing: 16) {
-                            // Steps Card
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Image(systemName: "figure.walk")
-                                        .foregroundColor(Color.pastelText)
-                                    Text("Steps")
-                                        .font(.caption)
-                                        .foregroundColor(Color.pastelTextMuted)
-                                }
-                                Text("\(Int(healthManager.dailySteps))")
-                                    .font(.title2.bold())
-                                    .foregroundColor(Color.pastelText)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.pastelCard)
-                            .cornerRadius(12)
-                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
-                            
-                            // Active Energy Card
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Image(systemName: "flame.fill")
-                                        .foregroundColor(Color.macroFats)
-                                    Text("Burned")
-                                        .font(.caption)
-                                        .foregroundColor(Color.pastelTextMuted)
-                                }
-                                Text("\(Int(healthManager.dailyActiveCalories)) kcal")
-                                    .font(.title2.bold())
-                                    .foregroundColor(Color.pastelText)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.pastelCard)
-                            .cornerRadius(12)
-                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
-                        }
-                    }
-                    .padding(.horizontal)
                     
                     // Progress Dashboard
                     VStack(spacing: 16) {
@@ -762,7 +708,7 @@ struct HomeView: View {
                                 .padding(.horizontal)
                                 
                             ForEach(goalFoods) { goalFood in
-                                DailyGoalCardView(goalFood: goalFood, todayEntries: todayEntries)
+                                DailyGoalCardView(goalFood: goalFood, todayEntries: todayEntries, isSmartEnabled: profile.smartNotificationsEnabled)
                             }
                         }
                     }
@@ -995,6 +941,8 @@ struct HomeView: View {
             try? modelContext.save()
         }
         
+        if profile.smartNotificationsEnabled { NotificationManager.shared.resetInactivityReminder() }
+        
         selectedFood = nil
         amountToLogStr = "1"
     }
@@ -1016,6 +964,8 @@ struct HomeView: View {
             modelContext.insert(entry) 
             try? modelContext.save()
         }
+        
+        if profile.smartNotificationsEnabled { NotificationManager.shared.resetInactivityReminder() }
         
         adHocName = ""
         adHocCaloriesStr = ""
@@ -1096,6 +1046,7 @@ struct HistoryView: View {
 struct DailyGoalCardView: View {
     let goalFood: FoodItem
     let todayEntries: [DailyEntry]
+    let isSmartEnabled: Bool
     @Environment(\.modelContext) private var modelContext
     
     @State private var logAmountStr = ""
@@ -1183,6 +1134,147 @@ struct DailyGoalCardView: View {
             calories: goalFood.caloriesPer100g * multiplier
         )
         
+        withAnimation {
+            modelContext.insert(entry)
+            try? modelContext.save()
+        }
+        
+        if isSmartEnabled { NotificationManager.shared.resetInactivityReminder() }
+    }
+}
+
+struct CalorieCalculatorView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) var scenePhase
+    var profile: UserProfile
+    @StateObject private var healthManager = HealthManager()
+    
+    @Query(sort: \DailyEntry.timestamp, order: .reverse) private var allEntries: [DailyEntry]
+    @Query(sort: \WorkoutEntry.timestamp, order: .reverse) private var workouts: [WorkoutEntry]
+    
+    var todayEntries: [DailyEntry] {
+        allEntries.filter { Calendar.current.isDateInToday($0.timestamp) }
+    }
+    var todayWorkouts: [WorkoutEntry] {
+        workouts.filter { Calendar.current.isDateInToday($0.timestamp) }
+    }
+    
+    var consumedCalories: Double { todayEntries.reduce(0) { $0 + $1.calories } }
+    
+    var sedentaryBurned: Double {
+        // Base starting point: Sedentary TDEE as negative
+        -(profile.bmr * 1.2)
+    }
+    
+    var stepsBurned: Double {
+        // 0.04 calories per step burned
+        -(healthManager.dailySteps * 0.04)
+    }
+    
+    var workoutsBurned: Double {
+        -todayWorkouts.reduce(0) { $0 + $1.caloriesBurned }
+    }
+    
+    var netCalories: Double {
+        consumedCalories + sedentaryBurned + stepsBurned + workoutsBurned
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    
+                    // Net Balance Hero
+                    VStack(spacing: 8) {
+                        Text("Net Calorie Balance")
+                            .font(.headline)
+                            .foregroundColor(Color.pastelTextMuted)
+                        
+                        Text(String(format: "%+.0f kcal", netCalories))
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
+                            .foregroundColor(netCalories > 0 ? Color.macroProteinText : Color.macroCaloriesText)
+                        
+                        Text(netCalories > 0 ? "You are currently in a surplus." : "You are currently in a deficit.")
+                            .font(.subheadline)
+                            .foregroundColor(Color.pastelTextMuted)
+                    }
+                    .padding(.top, 20)
+                    
+                    // Breakdown Card
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Calorie Breakdown")
+                            .font(.headline.bold())
+                            .foregroundColor(Color.pastelText)
+                        
+                        VStack(spacing: 12) {
+                            HStack {
+                                Text("🔥 Sedentary Burn")
+                                Spacer()
+                                Text(String(format: "%.0f kcal", sedentaryBurned)).foregroundColor(.gray)
+                            }
+                            
+                            HStack {
+                                Text("👟 Steps (\(Int(healthManager.dailySteps)))")
+                                Spacer()
+                                Text(String(format: "%.0f kcal", stepsBurned)).foregroundColor(.gray)
+                            }
+                            
+                            HStack {
+                                Text("💪 Workouts (\(todayWorkouts.count))")
+                                Spacer()
+                                Text(String(format: "%.0f kcal", workoutsBurned)).foregroundColor(.gray)
+                            }
+                            
+                            HStack {
+                                Text("🍔 Food Consumed")
+                                Spacer()
+                                Text(String(format: "+%.0f kcal", consumedCalories)).foregroundColor(.green)
+                            }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text("Net Total")
+                                    .bold()
+                                Spacer()
+                                Text(String(format: "%+.0f kcal", netCalories))
+                                    .bold()
+                                    .foregroundColor(netCalories > 0 ? Color.macroProteinText : Color.macroCaloriesText)
+                            }
+                        }
+                    }
+                    .softCardStyle()
+                    .padding(.horizontal)
+                    
+                    // Workout Button
+                    Button(action: logWorkout) {
+                        Text("Complete Workout (-250 kcal)")
+                            .font(.headline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.macroCalories) // Greenish pastel
+                            .foregroundColor(.white)
+                            .cornerRadius(24)
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.vertical)
+            }
+            .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
+            .navigationTitle("Calculator")
+            .onAppear {
+                healthManager.fetchTodayData()
+            }
+            .onChange(of: scenePhase) { newPhase in
+                if newPhase == .active {
+                    healthManager.fetchTodayData()
+                }
+            }
+        }
+    }
+    
+    private func logWorkout() {
+        let entry = WorkoutEntry(timestamp: Date(), caloriesBurned: 250.0)
         withAnimation {
             modelContext.insert(entry)
             try? modelContext.save()
