@@ -548,6 +548,7 @@ struct FoodMenuEntryView: View {
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     var profile: UserProfile
+    @StateObject private var healthManager = HealthManager()
     
     @Query(sort: \DailyEntry.timestamp, order: .reverse) private var allEntries: [DailyEntry]
     @Query(sort: \FoodItem.name) private var foodDatabase: [FoodItem]
@@ -663,6 +664,59 @@ struct HomeView: View {
                         }
                     }
                     .softCardStyle()
+                    .padding(.horizontal)
+                    
+                    // HealthKit Activity Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Today's Activity")
+                                .font(.headline.bold())
+                                .foregroundColor(Color.pastelText)
+                            Spacer()
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(Color.macroProtein)
+                        }
+                        
+                        HStack(spacing: 16) {
+                            // Steps Card
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Image(systemName: "figure.walk")
+                                        .foregroundColor(Color.pastelText)
+                                    Text("Steps")
+                                        .font(.caption)
+                                        .foregroundColor(Color.pastelTextMuted)
+                                }
+                                Text("\(Int(healthManager.dailySteps))")
+                                    .font(.title2.bold())
+                                    .foregroundColor(Color.pastelText)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.pastelCard)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
+                            
+                            // Active Energy Card
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Image(systemName: "flame.fill")
+                                        .foregroundColor(Color.macroFats)
+                                    Text("Burned")
+                                        .font(.caption)
+                                        .foregroundColor(Color.pastelTextMuted)
+                                }
+                                Text("\(Int(healthManager.dailyActiveCalories)) kcal")
+                                    .font(.title2.bold())
+                                    .foregroundColor(Color.pastelText)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.pastelCard)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
+                        }
+                    }
                     .padding(.horizontal)
                     
                     // Daily Goals section
