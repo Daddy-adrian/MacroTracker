@@ -11,10 +11,12 @@ extension Color {
     static let pastelBackground = Color(hex: "fdfaf6")
     static let pastelCard = Color.white
     static let pastelText = Color(hex: "2b2d42")
-    static let pastelTextMuted = Color(hex: "8d99ae")
+    static let pastelTextMuted = Color(hex: "6c7a89") // Deepened slate for better contrast
     
     static let macroCalories = Color(hex: "76c893")
     static let macroProtein = Color(hex: "ffb5a7")
+    static let macroProteinText = Color(hex: "d63031") // deep red for text contrast
+    static let macroCaloriesText = Color(hex: "00b894") // deep green for text contrast
     static let macroCarbs = Color(hex: "a8dadc")
     static let macroFats = Color(hex: "b3d89c")
 }
@@ -127,6 +129,7 @@ struct MainTabView: View {
                 }
         }
         .accentColor(Color.macroCalories)
+        .fontWeight(.medium) // Global bolding for all text within the app
         .font(.system(.body, design: .rounded))
     }
 }
@@ -319,9 +322,10 @@ struct SetupView: View {
                     if existingProfile != nil { showingSavedAlert = true }
                 }) {
                     Text(existingProfile == nil ? "Save & Continue" : "Update Profile")
+                        .font(.headline.bold())
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.macroProtein)
+                        .background(Color.macroCalories) // Save/Update is Green
                         .foregroundColor(.white)
                         .cornerRadius(24)
                 }
@@ -445,6 +449,7 @@ struct FoodMenuEntryView: View {
     
     @State private var unitName = ""
     @State private var unitWeightGramsStr = ""
+    @State private var dailyGoalStr = ""
     
     var isFormValid: Bool {
         !name.isEmpty && !proteinStr.isEmpty && !caloriesStr.isEmpty && !unitName.isEmpty && !unitWeightGramsStr.isEmpty
@@ -458,24 +463,28 @@ struct FoodMenuEntryView: View {
                 }
                 
                 Section(header: Text("Macros per 100g")) {
-                    HStack { Text("Calories (kcal)"); Spacer(); TextField("0", text: $caloriesStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
-                    HStack { Text("Protein (g)"); Spacer(); TextField("0", text: $proteinStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
-                    HStack { Text("Carbs (g)"); Spacer(); TextField("0", text: $carbsStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
-                    HStack { Text("Fat (g)"); Spacer(); TextField("0", text: $fatStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
-                    HStack { Text("Fiber (g)"); Spacer(); TextField("0", text: $fiberStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                    ZStack(alignment: .leading) { Text("Calories (kcal)").allowsHitTesting(false); TextField("0", text: $caloriesStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                    ZStack(alignment: .leading) { Text("Protein (g)").allowsHitTesting(false); TextField("0", text: $proteinStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                    ZStack(alignment: .leading) { Text("Carbs (g)").allowsHitTesting(false); TextField("0", text: $carbsStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                    ZStack(alignment: .leading) { Text("Fat (g)").allowsHitTesting(false); TextField("0", text: $fatStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                    ZStack(alignment: .leading) { Text("Fiber (g)").allowsHitTesting(false); TextField("0", text: $fiberStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
                 }
                 
                 Section(header: Text("Custom Measurement Unit"), footer: Text("Specify how you prefer to measure this food.")) {
-                    HStack { Text("Unit"); Spacer(); TextField("e.g. 1 spoon", text: $unitName).multilineTextAlignment(.trailing) }
-                    HStack { Text("Weight (grams)"); Spacer(); TextField("e.g. 20", text: $unitWeightGramsStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                    ZStack(alignment: .leading) { Text("Unit").allowsHitTesting(false); TextField("e.g. 1 spoon", text: $unitName).multilineTextAlignment(.trailing) }
+                    ZStack(alignment: .leading) { Text("Weight (grams)").allowsHitTesting(false); TextField("e.g. 20", text: $unitWeightGramsStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                }
+                
+                Section(header: Text("Daily Goal (Optional)"), footer: Text("Set how many units you want to eat every day.")) {
+                    ZStack(alignment: .leading) { Text("Goal Amount").allowsHitTesting(false); TextField("e.g. 4", text: $dailyGoalStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
             .navigationTitle(existingFood == nil ? "Add Food" : "Edit Food")
             .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
-                trailing: Button("Save") { saveFood() }.disabled(!isFormValid)
+                leading: Button("Cancel") { dismiss() }.bold().foregroundColor(Color.macroProteinText),
+                trailing: Button("Save") { saveFood() }.bold().disabled(!isFormValid).foregroundColor(isFormValid ? Color.macroCaloriesText : .gray)
             )
         }
         .onAppear { loadExisting() }
@@ -491,6 +500,10 @@ struct FoodMenuEntryView: View {
             caloriesStr = "\(food.caloriesPer100g)"
             unitName = food.unitName
             unitWeightGramsStr = "\(food.unitWeightGrams)"
+            
+            if food.dailyGoalAmount > 0 {
+                dailyGoalStr = "\(food.dailyGoalAmount)"
+            }
         }
     }
     
@@ -501,6 +514,7 @@ struct FoodMenuEntryView: View {
         let cleanFiber = Double(fiberStr.replacingOccurrences(of: ",", with: ".")) ?? 0
         let cleanCalories = Double(caloriesStr.replacingOccurrences(of: ",", with: ".")) ?? 0
         let cleanUnitWeight = Double(unitWeightGramsStr.replacingOccurrences(of: ",", with: ".")) ?? 100
+        let cleanGoalAmount = Double(dailyGoalStr.replacingOccurrences(of: ",", with: ".")) ?? 0.0
         
         if let food = existingFood {
             food.name = name
@@ -511,6 +525,7 @@ struct FoodMenuEntryView: View {
             food.caloriesPer100g = cleanCalories
             food.unitName = unitName
             food.unitWeightGrams = cleanUnitWeight
+            food.dailyGoalAmount = cleanGoalAmount
         } else {
             let food = FoodItem(
                 name: name,
@@ -520,7 +535,8 @@ struct FoodMenuEntryView: View {
                 fiberPer100g: cleanFiber,
                 caloriesPer100g: cleanCalories,
                 unitName: unitName,
-                unitWeightGrams: cleanUnitWeight
+                unitWeightGrams: cleanUnitWeight,
+                dailyGoalAmount: cleanGoalAmount
             )
             modelContext.insert(food)
         }
@@ -564,8 +580,21 @@ struct HomeView: View {
     var fatPct: Double { totalMacros > 0 ? (consumedFat / totalMacros) * 100 : 0 }
     
     var searchResults: [FoodItem] {
-        if searchText.isEmpty { return foodDatabase }
-        return foodDatabase.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        let baseItems = foodDatabase.filter { food in
+            if food.dailyGoalAmount <= 0 { return true }
+            let consumed = todayEntries.filter { $0.foodItem == food }.reduce(0.0) { $0 + ($1.consumedGrams / food.unitWeightGrams) }
+            return consumed >= food.dailyGoalAmount
+        }
+        if searchText.isEmpty { return baseItems }
+        return baseItems.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+    
+    var goalFoods: [FoodItem] {
+        foodDatabase.filter { food in
+            if food.dailyGoalAmount <= 0 { return false }
+            let consumed = todayEntries.filter { $0.foodItem == food }.reduce(0.0) { $0 + ($1.consumedGrams / food.unitWeightGrams) }
+            return consumed < food.dailyGoalAmount
+        }
     }
     
     var body: some View {
@@ -636,6 +665,19 @@ struct HomeView: View {
                     .softCardStyle()
                     .padding(.horizontal)
                     
+                    // Daily Goals section
+                    if !goalFoods.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Your Daily Menu")
+                                .font(.headline)
+                                .padding(.horizontal)
+                                
+                            ForEach(goalFoods) { goalFood in
+                                DailyGoalCardView(goalFood: goalFood, todayEntries: todayEntries)
+                            }
+                        }
+                    }
+                    
                     // Logging Forms
                     VStack(alignment: .leading) {
                         Text("Log Food")
@@ -654,10 +696,12 @@ struct HomeView: View {
                                 }
                                 HStack {
                                     Button("Cancel") { withAnimation { showingAdHocMenu = false } }
-                                        .foregroundColor(.red)
+                                        .bold()
+                                        .foregroundColor(Color.macroProteinText)
                                     Spacer()
-                                    Button("Log Temporary Item") {
-                                        logAdHocFood()
+                                    Button(action: { logAdHocFood() }) {
+                                        Text("Log Temporary Item")
+                                            .font(.body.bold())
                                     }
                                     .buttonStyle(.borderedProminent)
                                     .tint(Color.macroCalories)
@@ -671,56 +715,101 @@ struct HomeView: View {
                                 .padding(.horizontal)
                             
                             if !foodDatabase.isEmpty {
-                                List(searchResults) { food in
-                                    Button(action: {
-                                        selectedFood = food
-                                        searchText = ""
-                                    }) {
-                                        Text(food.name)
-                                            .font(.subheadline)
-                                            .foregroundColor(Color.pastelText)
-                                            .padding(.vertical, 2)
+                                ScrollView {
+                                    VStack(spacing: 8) {
+                                        ForEach(searchResults) { food in
+                                            Button(action: {
+                                                selectedFood = food
+                                                searchText = ""
+                                            }) {
+                                                HStack {
+                                                    Text(food.name)
+                                                        .font(.footnote)
+                                                        .bold()
+                                                        .foregroundColor(Color.pastelText)
+                                                    Spacer()
+                                                    Image(systemName: "chevron.right")
+                                                        .font(.caption2)
+                                                        .foregroundColor(Color.pastelTextMuted)
+                                                }
+                                                .padding(.vertical, 10)
+                                                .padding(.horizontal, 12)
+                                                .background(Color.pastelCard)
+                                                .cornerRadius(12)
+                                                .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                            }
+                                        }
                                     }
-                                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 4)
                                 }
-                                .frame(height: 200)
-                                .listStyle(PlainListStyle())
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.pastelTextMuted.opacity(0.3), lineWidth: 1)
-                                )
+                                .frame(height: 120)
                             }
                             
                             if let selected = selectedFood {
-                                VStack(spacing: 10) {
-                                    Text("Logging: **\(selected.name)**")
-                                    HStack {
-                                        TextField("Amount", text: $amountToLogStr)
-                                            .keyboardType(.decimalPad)
-                                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                                            .frame(width: 80)
-                                        Text("x \(selected.unitName) (\(Int(selected.unitWeightGrams))g)")
-                                        Spacer()
-                                        Button("Log") {
-                                            logSelectedFood()
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text(selected.name)
+                                                .font(.footnote)
+                                                .bold()
+                                                .foregroundColor(Color.pastelText)
+                                            Spacer()
+                                            Text("\(Int(selected.caloriesPer100g)) kcal/100g")
+                                                .font(.caption2)
+                                                .foregroundColor(Color.pastelTextMuted)
                                         }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(Color.macroCalories)
+                                        Text("\(selected.unitName) (\(Int(selected.unitWeightGrams))g)")
+                                            .font(.caption2)
+                                            .foregroundColor(Color.pastelTextMuted)
                                     }
-                                    Button("Cancel") { selectedFood = nil }
-                                        .foregroundColor(.red)
-                                        .font(.caption)
+                                    
+                                    TextField("Amt", text: $amountToLogStr)
+                                        .keyboardType(.decimalPad)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .frame(width: 40)
+                                        .font(.caption2)
+                                    
+                                    Button("Log") {
+                                        logSelectedFood()
+                                    }
+                                    .font(.caption2)
+                                    .bold()
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Color.pastelText)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(6)
+                                    .disabled(amountToLogStr.isEmpty)
+                                    
+                                    Button(action: { selectedFood = nil }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(Color.macroProteinText)
+                                            .font(.title3.bold())
+                                    }
                                 }
-                                .softCardStyle()
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 12)
+                                .background(Color.pastelCard)
+                                .cornerRadius(12)
+                                .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                                 .padding(.horizontal)
                             }
                             
-                            Button("Outside of Menu Food") {
+                            Button(action: {
                                 withAnimation { showingAdHocMenu = true }
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.app.fill")
+                                    Text("Outside of Menu Food")
+                                }
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.pastelTextMuted.opacity(0.15))
+                                .foregroundColor(Color.pastelText)
+                                .cornerRadius(12)
                             }
-                            .font(.headline)
-                            .foregroundColor(Color.pastelText)
                             .padding(.horizontal)
                             .padding(.top, 5)
                         }
@@ -738,24 +827,24 @@ struct HomeView: View {
                         }
                         
                         ForEach(todayEntries) { entry in
-                            HStack {
-                                VStack(alignment: .leading) {
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(entry.isAdHoc ? entry.adHocName : (entry.foodItem?.name ?? "Unknown"))
-                                        .font(.subheadline)
+                                        .font(.footnote)
                                         .bold()
                                         .foregroundColor(Color.pastelText)
                                     if !entry.isAdHoc {
                                         Text("\(entry.consumedGrams, specifier: "%.1f")g")
-                                            .font(.caption)
+                                            .font(.caption2)
                                             .foregroundColor(Color.pastelTextMuted)
                                     }
                                 }
+                                
                                 Spacer()
-                                VStack(alignment: .trailing) {
-                                    Text("\(Int(entry.calories)) kcal").font(.subheadline)
-                                        .foregroundColor(Color.pastelText)
-                                    Text("\(Int(entry.protein))g protein").font(.caption).foregroundColor(Color.pastelTextMuted)
-                                }
+                                
+                                Text("P \(Int(entry.protein)) C \(Int(entry.calories))")
+                                    .font(.caption2)
+                                    .foregroundColor(Color.pastelTextMuted)
                                 
                                 Button(role: .destructive) {
                                     withAnimation { 
@@ -764,21 +853,26 @@ struct HomeView: View {
                                     }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(Color(hex: "f0f3f5"))
+                                        .foregroundColor(Color.macroProteinText)
+                                        .font(.title3.bold())
                                 }
-                                .padding(.leading, 8)
+                                .padding(.leading, 4)
                             }
-                            .softCardStyle()
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
+                            .background(Color.pastelCard)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                             .padding(.horizontal)
                         }
                     }
                     
                     Button(action: saveAndResetDay) {
                         Text("Save & Reset Day")
-                            .font(.headline)
+                            .font(.headline.bold())
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.macroProtein)
+                            .background(Color.macroProtein) // Reset Day is Red
                             .foregroundColor(.white)
                             .cornerRadius(24)
                     }
@@ -905,6 +999,104 @@ struct HistoryView: View {
             .scrollContentBackground(.hidden)
             .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
             .navigationTitle("History")
+        }
+    }
+}
+
+// MARK: - Daily Goal Card View
+struct DailyGoalCardView: View {
+    let goalFood: FoodItem
+    let todayEntries: [DailyEntry]
+    @Environment(\.modelContext) private var modelContext
+    
+    @State private var logAmountStr = ""
+    
+    var consumedUnits: Double {
+        todayEntries.filter { $0.foodItem == goalFood }.reduce(0.0) { $0 + ($1.consumedGrams / goalFood.unitWeightGrams) }
+    }
+    
+    var remaining: Double {
+        max(0, goalFood.dailyGoalAmount - consumedUnits)
+    }
+    
+    var isDone: Bool { remaining == 0 }
+    
+    var body: some View {
+            HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(goalFood.name)
+                        .font(.footnote)
+                        .bold()
+                        .foregroundColor(Color.pastelText)
+                    Spacer()
+                    Text("\(consumedUnits, specifier: "%.1f") / \(goalFood.dailyGoalAmount, specifier: "%.1f")")
+                        .font(.caption2)
+                        .foregroundColor(Color.pastelTextMuted)
+                }
+                
+                ProgressBarView(
+                    progress: consumedUnits / max(0.001, goalFood.dailyGoalAmount),
+                    color: isDone ? Color.macroCalories : Color(hex: "a2d2ff") // Distinct pastel blue
+                )
+                .frame(height: 5)
+            }
+            
+            if !isDone {
+                TextField("Amt", text: $logAmountStr)
+                    .keyboardType(.decimalPad)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .frame(width: 40)
+                    .font(.caption2)
+                
+                Button("Log") {
+                    let cleanAmount = Double(logAmountStr.replacingOccurrences(of: ",", with: ".")) ?? 0
+                    if cleanAmount > 0 {
+                        logDirectly(amount: cleanAmount)
+                        logAmountStr = ""
+                    }
+                }
+                .font(.caption2)
+                .bold()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.pastelText)
+                .foregroundColor(.white)
+                .cornerRadius(6)
+                .disabled(logAmountStr.isEmpty)
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(Color.macroCalories)
+                    .font(.title3)
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(Color.pastelCard)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+        .padding(.horizontal)
+    }
+    
+    private func logDirectly(amount: Double) {
+        let totalGrams = amount * goalFood.unitWeightGrams
+        let multiplier = totalGrams / 100.0
+        
+        let entry = DailyEntry(
+            timestamp: Date(),
+            foodItem: goalFood,
+            isAdHoc: false,
+            consumedGrams: totalGrams,
+            protein: goalFood.proteinPer100g * multiplier,
+            carbs: goalFood.carbsPer100g * multiplier,
+            fat: goalFood.fatPer100g * multiplier,
+            fiber: goalFood.fiberPer100g * multiplier,
+            calories: goalFood.caloriesPer100g * multiplier
+        )
+        
+        withAnimation {
+            modelContext.insert(entry)
+            try? modelContext.save()
         }
     }
 }

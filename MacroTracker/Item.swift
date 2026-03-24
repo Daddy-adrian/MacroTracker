@@ -51,7 +51,9 @@ final class FoodItem {
     var unitName: String
     var unitWeightGrams: Double
     
-    init(name: String, proteinPer100g: Double, carbsPer100g: Double, fatPer100g: Double, fiberPer100g: Double, caloriesPer100g: Double, unitName: String = "100g", unitWeightGrams: Double = 100.0) {
+    var dailyGoalAmount: Double = 0.0
+    
+    init(name: String, proteinPer100g: Double, carbsPer100g: Double, fatPer100g: Double, fiberPer100g: Double, caloriesPer100g: Double, unitName: String = "100g", unitWeightGrams: Double = 100.0, dailyGoalAmount: Double = 0.0) {
         self.name = name
         self.proteinPer100g = proteinPer100g
         self.carbsPer100g = carbsPer100g
@@ -60,6 +62,7 @@ final class FoodItem {
         self.caloriesPer100g = caloriesPer100g
         self.unitName = unitName
         self.unitWeightGrams = unitWeightGrams
+        self.dailyGoalAmount = dailyGoalAmount
     }
 }
 
