@@ -28,6 +28,10 @@ struct MacroTrackerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                // The magic happens here:
+                .onAppear {
+                    DatabaseSeeder.seed(context: sharedModelContainer.mainContext)
+                }
         }
         .modelContainer(sharedModelContainer)
     }

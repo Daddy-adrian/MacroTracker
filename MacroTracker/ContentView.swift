@@ -173,6 +173,7 @@ struct SettingsWrapperView: View {
     }
 }
 
+// MARK: - Setup / Profile View
 struct SetupView: View {
     @Environment(\.modelContext) private var modelContext
     var existingProfile: UserProfile?
@@ -252,12 +253,6 @@ struct SetupView: View {
             }
         }
         .onAppear { loadExisting() }
-        .onChange(of: goal) { _ in hasEditedSliders = false }
-        .onChange(of: activityLevel) { _ in hasEditedSliders = false }
-        .onChange(of: weightStr) { _ in hasEditedSliders = false }
-        .onChange(of: heightStr) { _ in hasEditedSliders = false }
-        .onChange(of: ageStr) { _ in hasEditedSliders = false }
-        .onChange(of: isMale) { _ in hasEditedSliders = false }
     }
     
     var formContent: some View {
@@ -302,7 +297,7 @@ struct SetupView: View {
                 }
                 .listRowBackground(Color.pastelCard)
                 
-                Section(header: Text("Daily Targets"), footer: Text("Adjust your targets. Calories cannot fall below BMR (\(Int(bmr))). Protein cannot fall below \(Int(minimumProtein))g.")) {
+                Section(header: Text("Daily Targets"), footer: Text("Adjust your targets. Manual tweaks are saved until you reset them.")) {
                     VStack(alignment: .leading) {
                         Text("Calories: \(Int(displayCalories)) kcal")
                         Slider(
@@ -311,9 +306,9 @@ struct SetupView: View {
                                 set: { newValue in
                                     if !self.hasEditedSliders {
                                         self.manualProtein = self.displayProtein
-                                        self.hasEditedSliders = true
                                     }
                                     self.manualCalories = newValue
+                                    self.hasEditedSliders = true
                                 }
                             ),
                             in: bmr...max(bmr + 1, 5000),
@@ -329,14 +324,23 @@ struct SetupView: View {
                                 set: { newValue in
                                     if !self.hasEditedSliders {
                                         self.manualCalories = self.displayCalories
-                                        self.hasEditedSliders = true
                                     }
                                     self.manualProtein = newValue
+                                    self.hasEditedSliders = true
                                 }
                             ),
                             in: minimumProtein...max(minimumProtein + 1, 400),
                             step: 1
                         )
+                    }
+                    
+                    // Allow the user to reset to BMR calculations if they want
+                    if hasEditedSliders {
+                        Button("Reset to Recommended") {
+                            hasEditedSliders = false
+                        }
+                        .font(.caption)
+                        .foregroundColor(.blue)
                     }
                 }
                 .listRowBackground(Color.pastelCard)
@@ -371,13 +375,16 @@ struct SetupView: View {
             isMale = profile.isMale
             goal = profile.goal
             activityLevel = profile.activityLevel
+            
+            // Set sliders to saved state and lock them there
             manualCalories = profile.targetCalories
             manualProtein = profile.targetProtein
+            hasEditedSliders = true
+            
             smartNotificationsEnabled = profile.smartNotificationsEnabled
             if let wTime = profile.usualWorkoutTime {
                 usualWorkoutTime = wTime
             }
-            hasEditedSliders = true
         }
     }
     
@@ -412,6 +419,7 @@ struct SetupView: View {
     }
 }
 
+// MARK: - Food Database Views
 struct FoodDatabaseView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \FoodItem.name) private var foodDatabase: [FoodItem]
@@ -458,16 +466,16 @@ struct FoodDatabaseView: View {
             .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
             .navigationTitle("My Foods")
             .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                HStack(spacing: 16) {
-                                    ImportMenuButton() // Your new modular import feature!
-                                    
-                                    Button(action: { showingAddFoodMenu = true }) {
-                                        Image(systemName: "plus")
-                                    }
-                                }
-                            }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 16) {
+                        ImportMenuButton() // Your new modular import feature!
+                        
+                        Button(action: { showingAddFoodMenu = true }) {
+                            Image(systemName: "plus")
                         }
+                    }
+                }
+            }
             .sheet(isPresented: $showingAddFoodMenu) {
                 FoodMenuEntryView(existingFood: nil)
             }
@@ -593,6 +601,7 @@ struct FoodMenuEntryView: View {
     }
 }
 
+// MARK: - Dashboard Views
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     var profile: UserProfile
@@ -780,77 +789,77 @@ struct HomeView: View {
                                             }
                                         }
                                     }
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 4)
                                 }
-                                .frame(height: 120)
+                                .padding(.horizontal)
+                                .padding(.vertical, 4)
+                                .frame(height: 120) // <-- MOVED THIS INSIDE THE IF BLOCK
                             }
-                            
-                            if let selected = selectedFood {
-                                HStack(spacing: 8) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack {
-                                            Text(selected.name)
-                                                .font(.footnote).bold()
-                                                .foregroundColor(Color.pastelText)
-                                            Spacer()
-                                            Text("\(Int(selected.caloriesPer100g)) kcal/100g")
-                                                .font(.caption2)
-                                                .foregroundColor(Color.pastelTextMuted)
-                                        }
-                                        Text("\(selected.unitName) (\(Int(selected.unitWeightGrams))g)")
+                        }
+                        
+                        if let selected = selectedFood {
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(selected.name)
+                                            .font(.footnote).bold()
+                                            .foregroundColor(Color.pastelText)
+                                        Spacer()
+                                        Text("\(Int(selected.caloriesPer100g)) kcal/100g")
                                             .font(.caption2)
                                             .foregroundColor(Color.pastelTextMuted)
                                     }
-                                    
-                                    TextField("Amt", text: $amountToLogStr)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .frame(width: 40)
+                                    Text("\(selected.unitName) (\(Int(selected.unitWeightGrams))g)")
                                         .font(.caption2)
-                                    
-                                    Button("Log") {
-                                        logSelectedFood()
-                                    }
-                                    .font(.caption2).bold()
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color.pastelText)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(6)
-                                    .disabled(amountToLogStr.isEmpty)
-                                    
-                                    Button(action: { selectedFood = nil }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(Color.macroProteinText)
-                                            .font(.title3.bold())
-                                    }
+                                        .foregroundColor(Color.pastelTextMuted)
                                 }
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 12)
-                                .background(Color.pastelCard)
-                                .cornerRadius(12)
-                                .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                .padding(.horizontal)
-                            }
-                            
-                            Button(action: {
-                                withAnimation { showingAdHocMenu = true }
-                            }) {
-                                HStack {
-                                    Image(systemName: "plus.app.fill")
-                                    Text("Outside of Menu Food")
+                                
+                                TextField("Amt", text: $amountToLogStr)
+                                    .keyboardType(.decimalPad)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .frame(width: 40)
+                                    .font(.caption2)
+                                
+                                Button("Log") {
+                                    logSelectedFood()
                                 }
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.pastelTextMuted.opacity(0.15))
-                                .foregroundColor(Color.pastelText)
-                                .cornerRadius(12)
+                                .font(.caption2).bold()
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.pastelText)
+                                .foregroundColor(.white)
+                                .cornerRadius(6)
+                                .disabled(amountToLogStr.isEmpty)
+                                
+                                Button(action: { selectedFood = nil }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(Color.macroProteinText)
+                                        .font(.title3.bold())
+                                }
                             }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
+                            .background(Color.pastelCard)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                             .padding(.horizontal)
-                            .padding(.top, 5)
                         }
+                        
+                        Button(action: {
+                            withAnimation { showingAdHocMenu = true }
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.app.fill")
+                                Text("Outside of Menu Food")
+                            }
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.pastelTextMuted.opacity(0.15))
+                            .foregroundColor(Color.pastelText)
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 5)
                     }
                     
                     VStack(alignment: .leading, spacing: 12) {
@@ -907,7 +916,7 @@ struct HomeView: View {
                             .font(.headline.bold())
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.macroCaloriesText) // Vivid Green
+                            .background(Color.macroCaloriesText)
                             .foregroundColor(.white)
                             .cornerRadius(24)
                     }
@@ -1146,6 +1155,11 @@ struct CalorieCalculatorView: View {
         workouts.filter { Calendar.current.isDateInToday($0.timestamp) }
     }
     
+    // Check if the user has already logged a workout today
+    var hasWorkedOutToday: Bool {
+        !todayWorkouts.isEmpty
+    }
+    
     var consumedCalories: Double { todayEntries.reduce(0) { $0 + $1.calories } }
     var sedentaryBurned: Double { -(profile.bmr * 1.2) }
     var stepsBurned: Double { -(healthManager.dailySteps * 0.04) }
@@ -1180,12 +1194,14 @@ struct CalorieCalculatorView: View {
                     .softCardStyle()
                     .padding(.horizontal)
                     
-                    Button(action: logWorkout) {
-                        Text("Complete Workout (-250 kcal)")
+                    // NEW: Toggle Button Logic
+                    Button(action: toggleWorkout) {
+                        Text(hasWorkedOutToday ? "Workout Completed ✅ (Tap to Undo)" : "Complete Workout (-250 kcal)")
                             .font(.headline.bold())
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.macroCalories)
+                            // Changes color to a muted green/gray when completed
+                            .background(hasWorkedOutToday ? Color.macroCaloriesText.opacity(0.8) : Color.macroCalories)
                             .foregroundColor(.white)
                             .cornerRadius(24)
                     }
@@ -1196,20 +1212,24 @@ struct CalorieCalculatorView: View {
             .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
             .navigationTitle("Calculator")
             .onAppear { healthManager.fetchTodayData() }
-            .onChange(of: scenePhase) { newPhase in if newPhase == .active { healthManager.fetchTodayData() } }
+            .onChange(of: scenePhase) { _, newPhase in if newPhase == .active { healthManager.fetchTodayData() } }
         }
     }
     
-    private func logWorkout() {
-        let entry = WorkoutEntry(timestamp: Date(), caloriesBurned: 250.0)
+    // NEW: Function to handle both adding and undoing
+    private func toggleWorkout() {
         withAnimation {
-            modelContext.insert(entry)
+            if hasWorkedOutToday {
+                // Undo: Delete today's workouts
+                for workout in todayWorkouts {
+                    modelContext.delete(workout)
+                }
+            } else {
+                // Add: Create a new workout for today
+                let entry = WorkoutEntry(timestamp: Date(), caloriesBurned: 250.0)
+                modelContext.insert(entry)
+            }
             try? modelContext.save()
         }
     }
-}
-
-#Preview {
-    ContentView()
-        .modelContainer(for: UserProfile.self, inMemory: true)
 }
