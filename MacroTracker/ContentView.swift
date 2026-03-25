@@ -8,15 +8,15 @@ import SwiftData
 
 // MARK: - Theme & Styling
 extension Color {
-    static let pastelBackground = Color(hex: "fdfaf6")
+    static let pastelBackground = Color(hex: "C5D5C8") // soft Green
     static let pastelCard = Color.white
     static let pastelText = Color(hex: "2b2d42")
-    static let pastelTextMuted = Color(hex: "6c7a89") // Deepened slate for better contrast
+    static let pastelTextMuted = Color(hex: "6c7a89")
     
     static let macroCalories = Color(hex: "76c893")
     static let macroProtein = Color(hex: "ffb5a7")
-    static let macroProteinText = Color(hex: "d63031") // deep red for text contrast
-    static let macroCaloriesText = Color(hex: "00b894") // deep green for text contrast
+    static let macroProteinText = Color(hex: "d63031")
+    static let macroCaloriesText = Color(hex: "00b894") // Vivid Deep Green
     static let macroCarbs = Color(hex: "a8dadc")
     static let macroFats = Color(hex: "b3d89c")
 }
@@ -95,11 +95,14 @@ struct ContentView: View {
     @Query private var profiles: [UserProfile]
 
     var body: some View {
-        if let profile = profiles.first {
-            MainTabView(profile: profile)
-        } else {
-            SetupView()
+        Group {
+            if let profile = profiles.first {
+                MainTabView(profile: profile)
+            } else {
+                SetupView()
+            }
         }
+        .preferredColorScheme(.light) // Fixes Dark Mode text invisibility
     }
 }
 
@@ -134,7 +137,7 @@ struct MainTabView: View {
                 }
         }
         .accentColor(Color.macroCalories)
-        .fontWeight(.medium) // Global bolding for all text within the app
+        .fontWeight(.medium)
         .font(.system(.body, design: .rounded))
     }
 }
@@ -235,7 +238,7 @@ struct SetupView: View {
     }
     
     var displayProtein: Double {
-        hasEditedSliders ? manualProtein : max(defaultProtein, minimumProtein) 
+        hasEditedSliders ? manualProtein : max(defaultProtein, minimumProtein)
     }
     
     var isFormValid: Bool { weight > 0 && height > 0 && age > 0 }
@@ -270,6 +273,7 @@ struct SetupView: View {
                 TextField("Height (cm)", text: $heightStr).keyboardType(.decimalPad)
                 TextField("Age", text: $ageStr).keyboardType(.numberPad)
             }
+            .listRowBackground(Color.pastelCard)
             
             Section(header: Text("Lifestyle & Goal")) {
                 Picker("Goal", selection: $goal) {
@@ -281,6 +285,7 @@ struct SetupView: View {
                     }
                 }
             }
+            .listRowBackground(Color.pastelCard)
             
             Section(header: Text("Smart Reminders (Water, Food, Pre-Workout)")) {
                 Toggle("Enable Smart Reminders", isOn: $smartNotificationsEnabled)
@@ -288,12 +293,14 @@ struct SetupView: View {
                     DatePicker("Usual Workout Time", selection: $usualWorkoutTime, displayedComponents: .hourAndMinute)
                 }
             }
+            .listRowBackground(Color.pastelCard)
             
             if isFormValid {
                 Section(header: Text("Calculations")) {
                     HStack { Text("BMR"); Spacer(); Text("\(Int(bmr)) kcal") }
                     HStack { Text("TDEE"); Spacer(); Text("\(Int(tdee)) kcal") }
                 }
+                .listRowBackground(Color.pastelCard)
                 
                 Section(header: Text("Daily Targets"), footer: Text("Adjust your targets. Calories cannot fall below BMR (\(Int(bmr))). Protein cannot fall below \(Int(minimumProtein))g.")) {
                     VStack(alignment: .leading) {
@@ -332,6 +339,7 @@ struct SetupView: View {
                         )
                     }
                 }
+                .listRowBackground(Color.pastelCard)
                 
                 Button(action: {
                     saveProfile()
@@ -341,7 +349,7 @@ struct SetupView: View {
                         .font(.headline.bold())
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.macroCalories) // Save/Update is Green
+                        .background(Color.macroCalories)
                         .foregroundColor(.white)
                         .cornerRadius(24)
                 }
@@ -401,15 +409,6 @@ struct SetupView: View {
             modelContext.insert(profile)
         }
         try? modelContext.save()
-        
-        if smartNotificationsEnabled {
-            NotificationManager.shared.requestAuthorization()
-            NotificationManager.shared.scheduleWaterReminders()
-            NotificationManager.shared.schedulePreWorkoutReminder(for: usualWorkoutTime)
-            NotificationManager.shared.resetInactivityReminder()
-        } else {
-            NotificationManager.shared.removeAllScheduledNotifications()
-        }
     }
 }
 
@@ -425,6 +424,7 @@ struct FoodDatabaseView: View {
                 if foodDatabase.isEmpty {
                     Text("No foods in your menu yet. Add some!")
                         .foregroundColor(.gray)
+                        .listRowBackground(Color.pastelCard)
                 }
                 ForEach(foodDatabase) { food in
                     Button(action: { foodToEdit = food }) {
@@ -439,6 +439,13 @@ struct FoodDatabaseView: View {
                                 .foregroundColor(.blue)
                         }
                     }
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                    )
+                    .listRowSeparator(.hidden)
                 }
                 .onDelete { indexSet in
                     for index in indexSet {
@@ -451,12 +458,16 @@ struct FoodDatabaseView: View {
             .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
             .navigationTitle("My Foods")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddFoodMenu = true }) {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                HStack(spacing: 16) {
+                                    ImportMenuButton() // Your new modular import feature!
+                                    
+                                    Button(action: { showingAddFoodMenu = true }) {
+                                        Image(systemName: "plus")
+                                    }
+                                }
+                            }
+                        }
             .sheet(isPresented: $showingAddFoodMenu) {
                 FoodMenuEntryView(existingFood: nil)
             }
@@ -494,6 +505,7 @@ struct FoodMenuEntryView: View {
                 Section(header: Text("Food Name")) {
                     TextField("E.g., Tahini, Chicken, Rice", text: $name)
                 }
+                .listRowBackground(Color.white)
                 
                 Section(header: Text("Macros per 100g")) {
                     ZStack(alignment: .leading) { Text("Calories (kcal)").allowsHitTesting(false); TextField("0", text: $caloriesStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
@@ -502,15 +514,18 @@ struct FoodMenuEntryView: View {
                     ZStack(alignment: .leading) { Text("Fat (g)").allowsHitTesting(false); TextField("0", text: $fatStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
                     ZStack(alignment: .leading) { Text("Fiber (g)").allowsHitTesting(false); TextField("0", text: $fiberStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
                 }
+                .listRowBackground(Color.white)
                 
                 Section(header: Text("Custom Measurement Unit"), footer: Text("Specify how you prefer to measure this food.")) {
                     ZStack(alignment: .leading) { Text("Unit").allowsHitTesting(false); TextField("e.g. 1 spoon", text: $unitName).multilineTextAlignment(.trailing) }
                     ZStack(alignment: .leading) { Text("Weight (grams)").allowsHitTesting(false); TextField("e.g. 20", text: $unitWeightGramsStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
                 }
+                .listRowBackground(Color.white)
                 
                 Section(header: Text("Daily Goal (Optional)"), footer: Text("Set how many units you want to eat every day.")) {
                     ZStack(alignment: .leading) { Text("Goal Amount").allowsHitTesting(false); TextField("e.g. 4", text: $dailyGoalStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
                 }
+                .listRowBackground(Color.white)
             }
             .scrollContentBackground(.hidden)
             .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
@@ -635,7 +650,6 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     
-                    // Progress Dashboard
                     VStack(spacing: 16) {
                         HStack(alignment: .top) {
                             Text("Today's Summary")
@@ -649,7 +663,6 @@ struct HomeView: View {
                             }
                         }
                         
-                        // Calories
                         VStack(spacing: 4) {
                             HStack {
                                 Text("Calories 🔥")
@@ -663,7 +676,6 @@ struct HomeView: View {
                             ProgressBarView(progress: consumedCalories / max(1, profile.targetCalories), color: Color.macroCalories)
                         }
                         
-                        // Protein
                         VStack(spacing: 4) {
                             HStack {
                                 Text("Protein 🥩")
@@ -677,10 +689,8 @@ struct HomeView: View {
                             ProgressBarView(progress: consumedProtein / max(1, profile.targetProtein), color: Color.macroProtein)
                         }
                         
-                        Divider()
-                            .padding(.vertical, 4)
+                        Divider().padding(.vertical, 4)
                         
-                        // Percentages
                         HStack {
                             Text("Prot: \(Int(proteinPct))%")
                                 .foregroundColor(Color.macroProtein)
@@ -698,9 +708,6 @@ struct HomeView: View {
                     .softCardStyle()
                     .padding(.horizontal)
                     
-                    // End of Dashboard Modules
-                    
-                    // Daily Goals section
                     if !goalFoods.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Your Daily Menu")
@@ -713,7 +720,6 @@ struct HomeView: View {
                         }
                     }
                     
-                    // Logging Forms
                     VStack(alignment: .leading) {
                         Text("Log Food")
                             .font(.headline)
@@ -759,8 +765,7 @@ struct HomeView: View {
                                             }) {
                                                 HStack {
                                                     Text(food.name)
-                                                        .font(.footnote)
-                                                        .bold()
+                                                        .font(.footnote).bold()
                                                         .foregroundColor(Color.pastelText)
                                                     Spacer()
                                                     Image(systemName: "chevron.right")
@@ -786,8 +791,7 @@ struct HomeView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack {
                                             Text(selected.name)
-                                                .font(.footnote)
-                                                .bold()
+                                                .font(.footnote).bold()
                                                 .foregroundColor(Color.pastelText)
                                             Spacer()
                                             Text("\(Int(selected.caloriesPer100g)) kcal/100g")
@@ -808,8 +812,7 @@ struct HomeView: View {
                                     Button("Log") {
                                         logSelectedFood()
                                     }
-                                    .font(.caption2)
-                                    .bold()
+                                    .font(.caption2).bold()
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
                                     .background(Color.pastelText)
@@ -865,8 +868,7 @@ struct HomeView: View {
                             HStack(spacing: 8) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(entry.isAdHoc ? entry.adHocName : (entry.foodItem?.name ?? "Unknown"))
-                                        .font(.footnote)
-                                        .bold()
+                                        .font(.footnote).bold()
                                         .foregroundColor(Color.pastelText)
                                     if !entry.isAdHoc {
                                         Text("\(entry.consumedGrams, specifier: "%.1f")g")
@@ -874,15 +876,13 @@ struct HomeView: View {
                                             .foregroundColor(Color.pastelTextMuted)
                                     }
                                 }
-                                
                                 Spacer()
-                                
                                 Text("P \(Int(entry.protein)) C \(Int(entry.calories))")
                                     .font(.caption2)
                                     .foregroundColor(Color.pastelTextMuted)
                                 
                                 Button(role: .destructive) {
-                                    withAnimation { 
+                                    withAnimation {
                                         modelContext.delete(entry)
                                         try? modelContext.save()
                                     }
@@ -907,7 +907,7 @@ struct HomeView: View {
                             .font(.headline.bold())
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.macroProtein) // Reset Day is Red
+                            .background(Color.macroCaloriesText) // Vivid Green
                             .foregroundColor(.white)
                             .cornerRadius(24)
                     }
@@ -936,12 +936,10 @@ struct HomeView: View {
             fiber: food.fiberPer100g * multiplier,
             calories: food.caloriesPer100g * multiplier
         )
-        withAnimation { 
-            modelContext.insert(entry) 
+        withAnimation {
+            modelContext.insert(entry)
             try? modelContext.save()
         }
-        
-        if profile.smartNotificationsEnabled { NotificationManager.shared.resetInactivityReminder() }
         
         selectedFood = nil
         amountToLogStr = "1"
@@ -960,12 +958,10 @@ struct HomeView: View {
             protein: cleanPro,
             calories: cleanCals
         )
-        withAnimation { 
-            modelContext.insert(entry) 
+        withAnimation {
+            modelContext.insert(entry)
             try? modelContext.save()
         }
-        
-        if profile.smartNotificationsEnabled { NotificationManager.shared.resetInactivityReminder() }
         
         adHocName = ""
         adHocCaloriesStr = ""
@@ -1003,19 +999,17 @@ struct HistoryView: View {
                 if histories.isEmpty {
                     Text("No history logs yet.")
                         .foregroundColor(.gray)
+                        .listRowBackground(Color.pastelCard)
                 }
                 ForEach(histories) { history in
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(history.dateSaved, style: .date)
-                            .font(.headline)
-                        
+                        Text(history.dateSaved, style: .date).font(.headline)
                         HStack {
                             Text("\(Int(history.totalCalories)) kcal")
                             Spacer()
                             Text("\(Int(history.totalProtein))g Protein")
                         }
                         .font(.subheadline)
-                        
                         HStack {
                             Text("\(Int(history.totalCarbs))g C")
                             Spacer()
@@ -1023,16 +1017,19 @@ struct HistoryView: View {
                             Spacer()
                             Text("\(Int(history.totalFiber))g Fib.")
                         }
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        
+                        .font(.caption).foregroundColor(.gray)
                         if history.containsAdHoc {
                             Text("⚠️ Appx metrics (contained out-of-menu items)")
-                                .font(.caption2)
-                                .foregroundColor(.red)
+                                .font(.caption2).foregroundColor(.red)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                    )
+                    .listRowSeparator(.hidden)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -1065,19 +1062,14 @@ struct DailyGoalCardView: View {
             HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(goalFood.name)
-                        .font(.footnote)
-                        .bold()
-                        .foregroundColor(Color.pastelText)
+                    Text(goalFood.name).font(.footnote).bold().foregroundColor(Color.pastelText)
                     Spacer()
                     Text("\(consumedUnits, specifier: "%.1f") / \(goalFood.dailyGoalAmount, specifier: "%.1f")")
-                        .font(.caption2)
-                        .foregroundColor(Color.pastelTextMuted)
+                        .font(.caption2).foregroundColor(Color.pastelTextMuted)
                 }
-                
                 ProgressBarView(
                     progress: consumedUnits / max(0.001, goalFood.dailyGoalAmount),
-                    color: isDone ? Color.macroCalories : Color(hex: "a2d2ff") // Distinct pastel blue
+                    color: isDone ? Color.macroCalories : Color(hex: "a2d2ff")
                 )
                 .frame(height: 5)
             }
@@ -1096,8 +1088,7 @@ struct DailyGoalCardView: View {
                         logAmountStr = ""
                     }
                 }
-                .font(.caption2)
-                .bold()
+                .font(.caption2).bold()
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Color.pastelText)
@@ -1121,7 +1112,6 @@ struct DailyGoalCardView: View {
     private func logDirectly(amount: Double) {
         let totalGrams = amount * goalFood.unitWeightGrams
         let multiplier = totalGrams / 100.0
-        
         let entry = DailyEntry(
             timestamp: Date(),
             foodItem: goalFood,
@@ -1133,13 +1123,10 @@ struct DailyGoalCardView: View {
             fiber: goalFood.fiberPer100g * multiplier,
             calories: goalFood.caloriesPer100g * multiplier
         )
-        
         withAnimation {
             modelContext.insert(entry)
             try? modelContext.save()
         }
-        
-        if isSmartEnabled { NotificationManager.shared.resetInactivityReminder() }
     }
 }
 
@@ -1160,99 +1147,45 @@ struct CalorieCalculatorView: View {
     }
     
     var consumedCalories: Double { todayEntries.reduce(0) { $0 + $1.calories } }
-    
-    var sedentaryBurned: Double {
-        // Base starting point: Sedentary TDEE as negative
-        -(profile.bmr * 1.2)
-    }
-    
-    var stepsBurned: Double {
-        // 0.04 calories per step burned
-        -(healthManager.dailySteps * 0.04)
-    }
-    
-    var workoutsBurned: Double {
-        -todayWorkouts.reduce(0) { $0 + $1.caloriesBurned }
-    }
-    
-    var netCalories: Double {
-        consumedCalories + sedentaryBurned + stepsBurned + workoutsBurned
-    }
+    var sedentaryBurned: Double { -(profile.bmr * 1.2) }
+    var stepsBurned: Double { -(healthManager.dailySteps * 0.04) }
+    var workoutsBurned: Double { -todayWorkouts.reduce(0) { $0 + $1.caloriesBurned } }
+    var netCalories: Double { consumedCalories + sedentaryBurned + stepsBurned + workoutsBurned }
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    
-                    // Net Balance Hero
                     VStack(spacing: 8) {
-                        Text("Net Calorie Balance")
-                            .font(.headline)
-                            .foregroundColor(Color.pastelTextMuted)
-                        
+                        Text("Net Calorie Balance").font(.headline).foregroundColor(Color.pastelTextMuted)
                         Text(String(format: "%+.0f kcal", netCalories))
                             .font(.system(size: 40, weight: .bold, design: .rounded))
                             .foregroundColor(netCalories > 0 ? Color.macroProteinText : Color.macroCaloriesText)
-                        
                         Text(netCalories > 0 ? "You are currently in a surplus." : "You are currently in a deficit.")
-                            .font(.subheadline)
-                            .foregroundColor(Color.pastelTextMuted)
+                            .font(.subheadline).foregroundColor(Color.pastelTextMuted)
                     }
                     .padding(.top, 20)
                     
-                    // Breakdown Card
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Calorie Breakdown")
-                            .font(.headline.bold())
-                            .foregroundColor(Color.pastelText)
-                        
+                        Text("Calorie Breakdown").font(.headline.bold()).foregroundColor(Color.pastelText)
                         VStack(spacing: 12) {
-                            HStack {
-                                Text("🔥 Sedentary Burn")
-                                Spacer()
-                                Text(String(format: "%.0f kcal", sedentaryBurned)).foregroundColor(.gray)
-                            }
-                            
-                            HStack {
-                                Text("👟 Steps (\(Int(healthManager.dailySteps)))")
-                                Spacer()
-                                Text(String(format: "%.0f kcal", stepsBurned)).foregroundColor(.gray)
-                            }
-                            
-                            HStack {
-                                Text("💪 Workouts (\(todayWorkouts.count))")
-                                Spacer()
-                                Text(String(format: "%.0f kcal", workoutsBurned)).foregroundColor(.gray)
-                            }
-                            
-                            HStack {
-                                Text("🍔 Food Consumed")
-                                Spacer()
-                                Text(String(format: "+%.0f kcal", consumedCalories)).foregroundColor(.green)
-                            }
-                            
+                            HStack { Text("🔥 Sedentary Burn"); Spacer(); Text(String(format: "%.0f kcal", sedentaryBurned)).foregroundColor(.gray) }
+                            HStack { Text("👟 Steps (\(Int(healthManager.dailySteps)))"); Spacer(); Text(String(format: "%.0f kcal", stepsBurned)).foregroundColor(.gray) }
+                            HStack { Text("💪 Workouts (\(todayWorkouts.count))"); Spacer(); Text(String(format: "%.0f kcal", workoutsBurned)).foregroundColor(.gray) }
+                            HStack { Text("🍔 Food Consumed"); Spacer(); Text(String(format: "+%.0f kcal", consumedCalories)).foregroundColor(.green) }
                             Divider()
-                            
-                            HStack {
-                                Text("Net Total")
-                                    .bold()
-                                Spacer()
-                                Text(String(format: "%+.0f kcal", netCalories))
-                                    .bold()
-                                    .foregroundColor(netCalories > 0 ? Color.macroProteinText : Color.macroCaloriesText)
-                            }
+                            HStack { Text("Net Total").bold(); Spacer(); Text(String(format: "%+.0f kcal", netCalories)).bold().foregroundColor(netCalories > 0 ? Color.macroProteinText : Color.macroCaloriesText) }
                         }
                     }
                     .softCardStyle()
                     .padding(.horizontal)
                     
-                    // Workout Button
                     Button(action: logWorkout) {
                         Text("Complete Workout (-250 kcal)")
                             .font(.headline.bold())
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.macroCalories) // Greenish pastel
+                            .background(Color.macroCalories)
                             .foregroundColor(.white)
                             .cornerRadius(24)
                     }
@@ -1262,14 +1195,8 @@ struct CalorieCalculatorView: View {
             }
             .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
             .navigationTitle("Calculator")
-            .onAppear {
-                healthManager.fetchTodayData()
-            }
-            .onChange(of: scenePhase) { newPhase in
-                if newPhase == .active {
-                    healthManager.fetchTodayData()
-                }
-            }
+            .onAppear { healthManager.fetchTodayData() }
+            .onChange(of: scenePhase) { newPhase in if newPhase == .active { healthManager.fetchTodayData() } }
         }
     }
     
