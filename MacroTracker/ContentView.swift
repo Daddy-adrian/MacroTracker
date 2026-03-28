@@ -1049,6 +1049,7 @@ struct HistoryView: View {
 }
 
 // MARK: - Daily Goal Card View
+// MARK: - Daily Goal Card View
 struct DailyGoalCardView: View {
     let goalFood: FoodItem
     let todayEntries: [DailyEntry]
@@ -1068,11 +1069,16 @@ struct DailyGoalCardView: View {
     var isDone: Bool { remaining == 0 }
     
     var body: some View {
-            HStack(spacing: 8) {
+        HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(goalFood.name).font(.footnote).bold().foregroundColor(Color.pastelText)
+                    // UPDATED LINE BELOW: Added the unit name in parentheses
+                    Text("\(goalFood.name) (\(goalFood.unitName))")
+                        .font(.footnote).bold()
+                        .foregroundColor(Color.pastelText)
+                    
                     Spacer()
+                    
                     Text("\(consumedUnits, specifier: "%.1f") / \(goalFood.dailyGoalAmount, specifier: "%.1f")")
                         .font(.caption2).foregroundColor(Color.pastelTextMuted)
                 }
