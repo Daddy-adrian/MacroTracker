@@ -118,31 +118,41 @@ final class WorkoutEntry {
 }
 
 // MARK: - Database Seeder Logic (Updated Table)
+// MARK: - Database Seeder Logic (Final Corrected Values)
 struct DatabaseSeeder {
     @MainActor
     static func seed(context: ModelContext) {
+        // בודק אם הרשימה ריקה כדי למנוע כפילויות בכל הרצה
         let descriptor = FetchDescriptor<FoodItem>()
         if let existing = try? context.fetch(descriptor), existing.isEmpty {
             let menu = [
-                FoodItem(name: "Cheese", proteinPer100g: 30, carbsPer100g: 0, fatPer100g: 9, fiberPer100g: 0, caloriesPer100g: 200, unitName: "פרוסה", unitWeightGrams: 30, dailyGoalAmount: 5),
-                FoodItem(name: "Veggie Salad", proteinPer100g: 0, carbsPer100g: 0, fatPer100g: 5, fiberPer100g: 5, caloriesPer100g: 150, unitName: "100gr", unitWeightGrams: 100, dailyGoalAmount: 1),
-                FoodItem(name: "Tahini", proteinPer100g: 21, carbsPer100g: 3, fatPer100g: 56, fiberPer100g: 5, caloriesPer100g: 634, unitName: "spoon", unitWeightGrams: 50, dailyGoalAmount: 3),
-                FoodItem(name: "Meat", proteinPer100g: 22, carbsPer100g: 0, fatPer100g: 4.3, fiberPer100g: 0, caloriesPer100g: 200, unitName: "100gr", unitWeightGrams: 100, dailyGoalAmount: 3),
-                FoodItem(name: "Frozen Berries", proteinPer100g: 1.3, carbsPer100g: 7.6, fatPer100g: 0.4, fiberPer100g: 1.3, caloriesPer100g: 50, unitName: "100gr", unitWeightGrams: 100, dailyGoalAmount: 3),
-                FoodItem(name: "Eggs", proteinPer100g: 7, carbsPer100g: 0.65, fatPer100g: 6.15, fiberPer100g: 0, caloriesPer100g: 90, unitName: "ביצה", unitWeightGrams: 100, dailyGoalAmount: 2),
-                FoodItem(name: "Walnuts", proteinPer100g: 15.2, carbsPer100g: 13.7, fatPer100g: 65.2, fiberPer100g: 6.7, caloriesPer100g: 654, unitName: "אגוז", unitWeightGrams: 8, dailyGoalAmount: 4),
-                FoodItem(name: "Green Beans", proteinPer100g: 2, carbsPer100g: 3, fatPer100g: 0, fiberPer100g: 3, caloriesPer100g: 30, unitName: "100gr", unitWeightGrams: 100, dailyGoalAmount: 2),
-                FoodItem(name: "Pro Bread", proteinPer100g: 7, carbsPer100g: 1, fatPer100g: 4.5, fiberPer100g: 0, caloriesPer100g: 70, unitName: "slice", unitWeightGrams: 100, dailyGoalAmount: 1),
-                FoodItem(name: "Apple", proteinPer100g: 0, carbsPer100g: 26, fatPer100g: 0.3, fiberPer100g: 4.5, caloriesPer100g: 90, unitName: "fruit", unitWeightGrams: 100, dailyGoalAmount: 0),
-                FoodItem(name: "Cheeseburger", proteinPer100g: 27, carbsPer100g: 30, fatPer100g: 16.2, fiberPer100g: 0, caloriesPer100g: 379, unitName: "burger", unitWeightGrams: 100, dailyGoalAmount: 0),
-                FoodItem(name: "McDonalds Fries", proteinPer100g: 5, carbsPer100g: 34, fatPer100g: 15.2, fiberPer100g: 0, caloriesPer100g: 294, unitName: "fries", unitWeightGrams: 100, dailyGoalAmount: 0),
-                FoodItem(name: "Protein Chips", proteinPer100g: 20, carbsPer100g: 5, fatPer100g: 4.5, fiberPer100g: 1, caloriesPer100g: 140, unitName: "snack", unitWeightGrams: 100, dailyGoalAmount: 0),
-                FoodItem(name: "Yams", proteinPer100g: 2, carbsPer100g: 21, fatPer100g: 0.15, fiberPer100g: 3, caloriesPer100g: 100, unitName: "100gr", unitWeightGrams: 100, dailyGoalAmount: 0)
+                FoodItem(name: "טחינה מלאה", proteinPer100g: 22.0, carbsPer100g: 3.0, fatPer100g: 56.0, fiberPer100g: 15.0, caloriesPer100g: 631.0, unitName: "כף", unitWeightGrams: 15.0, dailyGoalAmount: 3.0),
+                
+                FoodItem(name: "גבינה צהובה", proteinPer100g: 30.0, carbsPer100g: 0.2, fatPer100g: 9.0, fiberPer100g: 0.0, caloriesPer100g: 202.0, unitName: "פרוסה", unitWeightGrams: 30.0, dailyGoalAmount: 3.0),
+                
+                FoodItem(name: "שייטל (בקר)", proteinPer100g: 22.0, carbsPer100g: 0.0, fatPer100g: 4.2, fiberPer100g: 0.0, caloriesPer100g: 200.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 2.0),
+                
+                FoodItem(name: "כבד עוף", proteinPer100g: 25.0, carbsPer100g: 0.9, fatPer100g: 6.5, fiberPer100g: 0.0, caloriesPer100g: 170.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 1.5),
+                
+                FoodItem(name: "ביצה קשה", proteinPer100g: 12.5, carbsPer100g: 1.12, fatPer100g: 10.6, fiberPer100g: 0.0, caloriesPer100g: 155.0, unitName: "ביצה", unitWeightGrams: 70.0, dailyGoalAmount: 3.0),
+                
+                FoodItem(name: "שעועית ירוקה", proteinPer100g: 2.0, carbsPer100g: 1.0, fatPer100g: 0.5, fiberPer100g: 2.2, caloriesPer100g: 29.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 5.0),
+                
+                FoodItem(name: "פירות יער קפואים", proteinPer100g: 1.3, carbsPer100g: 3.8, fatPer100g: 0.0, fiberPer100g: 3.8, caloriesPer100g: 45.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 2.0),
+                
+                FoodItem(name: "שמן זית", proteinPer100g: 0.0, carbsPer100g: 0.0, fatPer100g: 100.0, fiberPer100g: 0.0, caloriesPer100g: 1000.0, unitName: "כף", unitWeightGrams: 10.0, dailyGoalAmount: 2.0)
             ]
+            
             for item in menu {
                 context.insert(item)
             }
-            try? context.save()
+            
+            do {
+                try context.save()
+                print("✅ Database successfully seeded with Adrian's custom menu.")
+            } catch {
+                print("❌ Failed to seed database: \(error.localizedDescription)")
+            }
         }
     }
 }
