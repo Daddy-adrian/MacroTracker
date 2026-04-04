@@ -19,6 +19,7 @@ extension Color {
     static let macroCaloriesText = Color(hex: "00b894") // Vivid Deep Green
     static let macroCarbs = Color(hex: "a8dadc")
     static let macroFats = Color(hex: "b3d89c")
+    static let macroFiber = Color(hex: "81c784") // A soft teal/green for fiber
 }
 
 extension Color {
@@ -439,12 +440,9 @@ struct FoodDatabaseView: View {
                         VStack(alignment: .leading) {
                             Text(food.name).font(.headline)
                                 .foregroundColor(Color.pastelText)
-                            Text("\(Int(food.caloriesPer100g)) kcal | \(Int(food.proteinPer100g))g P per 100g")
+                            Text("\(Int(food.caloriesPer100g)) kcal | \(Int(food.proteinPer100g))p | \(Int(food.carbsPer100g))c | \(Int(food.fatPer100g))f per 100g")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("Custom Unit: \(food.unitName) (\(Int(food.unitWeightGrams))g)")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
                         }
                     }
                     .listRowBackground(
@@ -499,12 +497,12 @@ struct FoodMenuEntryView: View {
     @State private var fiberStr = ""
     @State private var caloriesStr = ""
     
-    @State private var unitName = ""
-    @State private var unitWeightGramsStr = ""
-    @State private var dailyGoalStr = ""
+    @State private var unitName: String = ""
+    @State private var unitWeightStr: String = ""
+    @State private var dailyGoalStr: String = ""
     
     var isFormValid: Bool {
-        !name.isEmpty && !proteinStr.isEmpty && !caloriesStr.isEmpty && !unitName.isEmpty && !unitWeightGramsStr.isEmpty
+        !name.isEmpty && !proteinStr.isEmpty && !caloriesStr.isEmpty
     }
     
     var body: some View {
@@ -524,14 +522,10 @@ struct FoodMenuEntryView: View {
                 }
                 .listRowBackground(Color.white)
                 
-                Section(header: Text("Custom Measurement Unit"), footer: Text("Specify how you prefer to measure this food.")) {
-                    ZStack(alignment: .leading) { Text("Unit").allowsHitTesting(false); TextField("e.g. 1 spoon", text: $unitName).multilineTextAlignment(.trailing) }
-                    ZStack(alignment: .leading) { Text("Weight (grams)").allowsHitTesting(false); TextField("e.g. 20", text: $unitWeightGramsStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
-                }
-                .listRowBackground(Color.white)
-                
-                Section(header: Text("Daily Goal (Optional)"), footer: Text("Set how many units you want to eat every day.")) {
-                    ZStack(alignment: .leading) { Text("Goal Amount").allowsHitTesting(false); TextField("e.g. 4", text: $dailyGoalStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                Section(header: Text("Unit & Tracking (Optional)")) {
+                    TextField("Unit Name (e.g., slice, spoon)", text: $unitName)
+                    ZStack(alignment: .leading) { Text("Unit Weight (g)").allowsHitTesting(false); TextField("100", text: $unitWeightStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
+                    ZStack(alignment: .leading) { Text("Daily Goal (units)").allowsHitTesting(false); TextField("Optional", text: $dailyGoalStr).multilineTextAlignment(.trailing).keyboardType(.decimalPad) }
                 }
                 .listRowBackground(Color.white)
             }
@@ -555,10 +549,9 @@ struct FoodMenuEntryView: View {
             fiberStr = "\(food.fiberPer100g)"
             caloriesStr = "\(food.caloriesPer100g)"
             unitName = food.unitName
-            unitWeightGramsStr = "\(food.unitWeightGrams)"
-            
-            if food.dailyGoalAmount > 0 {
-                dailyGoalStr = "\(food.dailyGoalAmount)"
+            unitWeightStr = "\(food.unitWeight)"
+            if let goal = food.dailyGoal {
+                dailyGoalStr = "\(goal)"
             }
         }
     }
@@ -569,8 +562,9 @@ struct FoodMenuEntryView: View {
         let cleanFat = Double(fatStr.replacingOccurrences(of: ",", with: ".")) ?? 0
         let cleanFiber = Double(fiberStr.replacingOccurrences(of: ",", with: ".")) ?? 0
         let cleanCalories = Double(caloriesStr.replacingOccurrences(of: ",", with: ".")) ?? 0
-        let cleanUnitWeight = Double(unitWeightGramsStr.replacingOccurrences(of: ",", with: ".")) ?? 100
-        let cleanGoalAmount = Double(dailyGoalStr.replacingOccurrences(of: ",", with: ".")) ?? 0.0
+        
+        let targetUnitWeight = Double(unitWeightStr.replacingOccurrences(of: ",", with: ".")) ?? 100.0
+        let targetGoal = Double(dailyGoalStr.replacingOccurrences(of: ",", with: "."))
         
         if let food = existingFood {
             food.name = name
@@ -580,8 +574,8 @@ struct FoodMenuEntryView: View {
             food.fiberPer100g = cleanFiber
             food.caloriesPer100g = cleanCalories
             food.unitName = unitName
-            food.unitWeightGrams = cleanUnitWeight
-            food.dailyGoalAmount = cleanGoalAmount
+            food.unitWeight = targetUnitWeight
+            food.dailyGoal = targetGoal
         } else {
             let food = FoodItem(
                 name: name,
@@ -591,8 +585,8 @@ struct FoodMenuEntryView: View {
                 fiberPer100g: cleanFiber,
                 caloriesPer100g: cleanCalories,
                 unitName: unitName,
-                unitWeightGrams: cleanUnitWeight,
-                dailyGoalAmount: cleanGoalAmount
+                unitWeight: targetUnitWeight,
+                dailyGoal: targetGoal
             )
             modelContext.insert(food)
         }
@@ -602,6 +596,66 @@ struct FoodMenuEntryView: View {
 }
 
 // MARK: - Dashboard Views
+struct GoalTrackerRow: View {
+    @Environment(\.modelContext) private var modelContext
+    var food: FoodItem
+    var consumed: Double
+    
+    @State private var inputStr: String = "1"
+    
+    var body: some View {
+        HStack {
+            Text("\(food.name): \(consumed, specifier: "%g") / \(food.dailyGoal ?? 0, specifier: "%g") \(food.unitName)")
+                .font(.subheadline)
+                .foregroundColor(Color.pastelText)
+            
+            Spacer()
+            
+            TextField("1", text: $inputStr)
+                .keyboardType(.decimalPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(width: 50)
+            
+            Button(action: logManualUnits) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundColor(Color.macroCalories)
+                    .font(.title2)
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+    }
+    
+    private func logManualUnits() {
+        let cleanInputStr = inputStr.replacingOccurrences(of: ",", with: ".")
+        let unitsToLog = Double(cleanInputStr) ?? 1.0
+        
+        let targetUnitWeight = max(1.0, food.unitWeight)
+        let totalGrams = unitsToLog * targetUnitWeight
+        let multiplier = totalGrams / 100.0
+        
+        let entry = DailyEntry(
+            timestamp: Date(),
+            foodItem: food,
+            isAdHoc: false,
+            consumedGrams: totalGrams,
+            protein: food.proteinPer100g * multiplier,
+            carbs: food.carbsPer100g * multiplier,
+            fat: food.fatPer100g * multiplier,
+            fiber: food.fiberPer100g * multiplier,
+            calories: food.caloriesPer100g * multiplier
+        )
+        withAnimation {
+            modelContext.insert(entry)
+            try? modelContext.save()
+        }
+        
+        inputStr = "1"
+    }
+}
+
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     var profile: UserProfile
@@ -611,9 +665,8 @@ struct HomeView: View {
     
     @State private var showingAdHocMenu = false
     
-    @State private var searchText = ""
     @State private var selectedFood: FoodItem?
-    @State private var amountToLogStr = "1"
+    @State private var gramsToLogStr = "100"
     
     @State private var adHocName = ""
     @State private var adHocProteinStr = ""
@@ -631,27 +684,19 @@ struct HomeView: View {
     
     var hasAdHoc: Bool { todayEntries.contains { $0.isAdHoc } }
     
-    var totalMacros: Double { consumedProtein + consumedCarbs + consumedFat }
-    var proteinPct: Double { totalMacros > 0 ? (consumedProtein / totalMacros) * 100 : 0 }
-    var carbsPct: Double { totalMacros > 0 ? (consumedCarbs / totalMacros) * 100 : 0 }
-    var fatPct: Double { totalMacros > 0 ? (consumedFat / totalMacros) * 100 : 0 }
-    
-    var searchResults: [FoodItem] {
-        let baseItems = foodDatabase.filter { food in
-            if food.dailyGoalAmount <= 0 { return true }
-            let consumed = todayEntries.filter { $0.foodItem == food }.reduce(0.0) { $0 + ($1.consumedGrams / food.unitWeightGrams) }
-            return consumed >= food.dailyGoalAmount
+    var activeGoalFoods: [FoodItem] {
+        foodDatabase.filter { food in
+            if let goal = food.dailyGoal, goal > 0 {
+                let units = unitsConsumed(for: food)
+                return units < Double(goal)
+            }
+            return false
         }
-        if searchText.isEmpty { return baseItems }
-        return baseItems.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
     
-    var goalFoods: [FoodItem] {
-        foodDatabase.filter { food in
-            if food.dailyGoalAmount <= 0 { return false }
-            let consumed = todayEntries.filter { $0.foodItem == food }.reduce(0.0) { $0 + ($1.consumedGrams / food.unitWeightGrams) }
-            return consumed < food.dailyGoalAmount
-        }
+    func unitsConsumed(for food: FoodItem) -> Double {
+        let consumedGrams = todayEntries.filter { $0.foodItem == food }.reduce(0) { $0 + $1.consumedGrams }
+        return consumedGrams / max(1.0, food.unitWeight)
     }
     
     var body: some View {
@@ -701,35 +746,45 @@ struct HomeView: View {
                         Divider().padding(.vertical, 4)
                         
                         HStack {
-                            Text("Prot: \(Int(proteinPct))%")
-                                .foregroundColor(Color.macroProtein)
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                            VStack(alignment: .leading) {
+                                Text("P: \(Int(consumedProtein))g")
+                                    .foregroundColor(Color.macroProtein)
+                            }
                             Spacer()
-                            Text("Carbs: \(Int(carbsPct))%")
-                                .foregroundColor(Color.macroCarbs)
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                            VStack(alignment: .leading) {
+                                Text("C: \(Int(consumedCarbs))g")
+                                    .foregroundColor(Color.macroCarbs)
+                            }
                             Spacer()
-                            Text("Fat: \(Int(fatPct))%")
-                                .foregroundColor(Color.macroFats)
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                            VStack(alignment: .leading) {
+                                Text("F: \(Int(consumedFat))g")
+                                    .foregroundColor(Color.macroFats)
+                            }
+                            Spacer()
+                            VStack(alignment: .leading) {
+                                Text("Fib: \(Int(consumedFiber))g")
+                                    .foregroundColor(Color.macroFiber)
+                            }
                         }
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                     }
                     .softCardStyle()
                     .padding(.horizontal)
                     
-                    if !goalFoods.isEmpty {
+                    if !activeGoalFoods.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Your Daily Menu")
+                            Text("Daily Goals Tracker")
                                 .font(.headline)
                                 .padding(.horizontal)
-                                
-                            ForEach(goalFoods) { goalFood in
-                                DailyGoalCardView(goalFood: goalFood, todayEntries: todayEntries, isSmartEnabled: profile.smartNotificationsEnabled)
+                            
+                            ForEach(activeGoalFoods) { food in
+                                GoalTrackerRow(food: food, consumed: unitsConsumed(for: food))
+                                    .padding(.horizontal)
                             }
                         }
                     }
                     
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Log Food")
                             .font(.headline)
                             .padding(.horizontal)
@@ -760,87 +815,52 @@ struct HomeView: View {
                             .softCardStyle()
                             .padding(.horizontal)
                         } else {
-                            TextField("🔍 Search your foods...", text: $searchText)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                            VStack(spacing: 12) {
+                                Picker("Select Food", selection: $selectedFood) {
+                                    Text("Choose a food...").tag(nil as FoodItem?)
+                                    ForEach(foodDatabase) { food in
+                                        Text(food.name).tag(food as FoodItem?)
+                                    }
+                                }
+                                .pickerStyle(MenuPickerStyle())
                                 .padding(.horizontal)
-                            
-                            if !foodDatabase.isEmpty {
-                                ScrollView {
-                                    VStack(spacing: 8) {
-                                        ForEach(searchResults) { food in
-                                            Button(action: {
-                                                selectedFood = food
-                                                searchText = ""
-                                            }) {
-                                                HStack {
-                                                    Text(food.name)
-                                                        .font(.footnote).bold()
-                                                        .foregroundColor(Color.pastelText)
-                                                    Spacer()
-                                                    Image(systemName: "chevron.right")
-                                                        .font(.caption2)
-                                                        .foregroundColor(Color.pastelTextMuted)
-                                                }
+                                .frame(maxWidth: .infinity)
+                                .background(Color.pastelCard)
+                                .cornerRadius(12)
+                                .softCardStyle()
+                                .onChange(of: selectedFood) { _, newValue in
+                                    if let newSelected = newValue {
+                                        gramsToLogStr = newSelected.unitName.isEmpty ? "100" : "1"
+                                    }
+                                }
+                                
+                                if let selected = selectedFood {
+                                    HStack {
+                                        Text(selected.unitName.isEmpty ? "Grams:" : "\(selected.unitName):")
+                                            .font(.subheadline.bold())
+                                        TextField(selected.unitName.isEmpty ? "100" : "1", text: $gramsToLogStr)
+                                            .keyboardType(.decimalPad)
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                            .frame(width: 80)
+                                        
+                                        Spacer()
+                                        
+                                        Button(action: logSelectedFood) {
+                                            Text("Log \(selected.name)")
+                                                .font(.body.bold())
+                                                .padding(.horizontal, 16)
                                                 .padding(.vertical, 10)
-                                                .padding(.horizontal, 12)
-                                                .background(Color.pastelCard)
+                                                .background(Color.macroCalories)
+                                                .foregroundColor(.white)
                                                 .cornerRadius(12)
-                                                .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                            }
                                         }
                                     }
-                                }
-                                .padding(.horizontal)
-                                .padding(.vertical, 4)
-                                .frame(height: 120) // <-- MOVED THIS INSIDE THE IF BLOCK
-                            }
-                        }
-                        
-                        if let selected = selectedFood {
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(selected.name)
-                                            .font(.footnote).bold()
-                                            .foregroundColor(Color.pastelText)
-                                        Spacer()
-                                        Text("\(Int(selected.caloriesPer100g)) kcal/100g")
-                                            .font(.caption2)
-                                            .foregroundColor(Color.pastelTextMuted)
-                                    }
-                                    Text("\(selected.unitName) (\(Int(selected.unitWeightGrams))g)")
-                                        .font(.caption2)
-                                        .foregroundColor(Color.pastelTextMuted)
-                                }
-                                
-                                TextField("Amt", text: $amountToLogStr)
-                                    .keyboardType(.decimalPad)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .frame(width: 40)
-                                    .font(.caption2)
-                                
-                                Button("Log") {
-                                    logSelectedFood()
-                                }
-                                .font(.caption2).bold()
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.pastelText)
-                                .foregroundColor(.white)
-                                .cornerRadius(6)
-                                .disabled(amountToLogStr.isEmpty)
-                                
-                                Button(action: { selectedFood = nil }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(Color.macroProteinText)
-                                        .font(.title3.bold())
+                                    .padding()
+                                    .background(Color.white)
+                                    .cornerRadius(16)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                                 }
                             }
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 12)
-                            .background(Color.pastelCard)
-                            .cornerRadius(12)
-                            .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                             .padding(.horizontal)
                         }
                         
@@ -928,10 +948,35 @@ struct HomeView: View {
         }
     }
     
+    private func logQuickUnit(for food: FoodItem) {
+        let totalGrams = max(1.0, food.unitWeight)
+        let multiplier = totalGrams / 100.0
+        
+        let entry = DailyEntry(
+            timestamp: Date(),
+            foodItem: food,
+            isAdHoc: false,
+            consumedGrams: totalGrams,
+            protein: food.proteinPer100g * multiplier,
+            carbs: food.carbsPer100g * multiplier,
+            fat: food.fatPer100g * multiplier,
+            fiber: food.fiberPer100g * multiplier,
+            calories: food.caloriesPer100g * multiplier
+        )
+        withAnimation {
+            modelContext.insert(entry)
+            try? modelContext.save()
+        }
+    }
+
     private func logSelectedFood() {
         guard let food = selectedFood else { return }
-        let cleanAmount = Double(amountToLogStr.replacingOccurrences(of: ",", with: ".")) ?? 1.0
-        let totalGrams = cleanAmount * food.unitWeightGrams
+        
+        let inputStr = gramsToLogStr.replacingOccurrences(of: ",", with: ".")
+        let inputVal = Double(inputStr) ?? (food.unitName.isEmpty ? 100.0 : 1.0)
+        let targetUnitWeight = food.unitName.isEmpty ? 100.0 : food.unitWeight
+        let totalGrams = food.unitName.isEmpty ? inputVal : inputVal * targetUnitWeight
+        
         let multiplier = totalGrams / 100.0
         
         let entry = DailyEntry(
@@ -951,7 +996,7 @@ struct HomeView: View {
         }
         
         selectedFood = nil
-        amountToLogStr = "1"
+        gramsToLogStr = "100"
     }
     
     private func logAdHocFood() {
@@ -1048,102 +1093,6 @@ struct HistoryView: View {
     }
 }
 
-// MARK: - Daily Goal Card View
-// MARK: - Daily Goal Card View
-struct DailyGoalCardView: View {
-    let goalFood: FoodItem
-    let todayEntries: [DailyEntry]
-    let isSmartEnabled: Bool
-    @Environment(\.modelContext) private var modelContext
-    
-    @State private var logAmountStr = ""
-    
-    var consumedUnits: Double {
-        todayEntries.filter { $0.foodItem == goalFood }.reduce(0.0) { $0 + ($1.consumedGrams / goalFood.unitWeightGrams) }
-    }
-    
-    var remaining: Double {
-        max(0, goalFood.dailyGoalAmount - consumedUnits)
-    }
-    
-    var isDone: Bool { remaining == 0 }
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    // UPDATED LINE BELOW: Added the unit name in parentheses
-                    Text("\(goalFood.name) (\(goalFood.unitName))")
-                        .font(.footnote).bold()
-                        .foregroundColor(Color.pastelText)
-                    
-                    Spacer()
-                    
-                    Text("\(consumedUnits, specifier: "%.1f") / \(goalFood.dailyGoalAmount, specifier: "%.1f")")
-                        .font(.caption2).foregroundColor(Color.pastelTextMuted)
-                }
-                ProgressBarView(
-                    progress: consumedUnits / max(0.001, goalFood.dailyGoalAmount),
-                    color: isDone ? Color.macroCalories : Color(hex: "a2d2ff")
-                )
-                .frame(height: 5)
-            }
-            
-            if !isDone {
-                TextField("Amt", text: $logAmountStr)
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .frame(width: 40)
-                    .font(.caption2)
-                
-                Button("Log") {
-                    let cleanAmount = Double(logAmountStr.replacingOccurrences(of: ",", with: ".")) ?? 0
-                    if cleanAmount > 0 {
-                        logDirectly(amount: cleanAmount)
-                        logAmountStr = ""
-                    }
-                }
-                .font(.caption2).bold()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.pastelText)
-                .foregroundColor(.white)
-                .cornerRadius(6)
-                .disabled(logAmountStr.isEmpty)
-            } else {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(Color.macroCalories)
-                    .font(.title3)
-            }
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(Color.pastelCard)
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-        .padding(.horizontal)
-    }
-    
-    private func logDirectly(amount: Double) {
-        let totalGrams = amount * goalFood.unitWeightGrams
-        let multiplier = totalGrams / 100.0
-        let entry = DailyEntry(
-            timestamp: Date(),
-            foodItem: goalFood,
-            isAdHoc: false,
-            consumedGrams: totalGrams,
-            protein: goalFood.proteinPer100g * multiplier,
-            carbs: goalFood.carbsPer100g * multiplier,
-            fat: goalFood.fatPer100g * multiplier,
-            fiber: goalFood.fiberPer100g * multiplier,
-            calories: goalFood.caloriesPer100g * multiplier
-        )
-        withAnimation {
-            modelContext.insert(entry)
-            try? modelContext.save()
-        }
-    }
-}
 
 struct CalorieCalculatorView: View {
     @Environment(\.modelContext) private var modelContext
@@ -1161,9 +1110,12 @@ struct CalorieCalculatorView: View {
         workouts.filter { Calendar.current.isDateInToday($0.timestamp) }
     }
     
-    // Check if the user has already logged a workout today
-    var hasWorkedOutToday: Bool {
-        !todayWorkouts.isEmpty
+    var hasMainWorkout: Bool {
+        todayWorkouts.contains { $0.name == "Main Workout" }
+    }
+    
+    var hasSwingsClimbers: Bool {
+        todayWorkouts.contains { $0.name == "Swings & Climbers" }
     }
     
     var consumedCalories: Double { todayEntries.reduce(0) { $0 + $1.calories } }
@@ -1201,15 +1153,26 @@ struct CalorieCalculatorView: View {
                     .padding(.horizontal)
                     
                     // NEW: Toggle Button Logic
-                    Button(action: toggleWorkout) {
-                        Text(hasWorkedOutToday ? "Workout Completed ✅ (Tap to Undo)" : "Complete Workout (-250 kcal)")
-                            .font(.headline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            // Changes color to a muted green/gray when completed
-                            .background(hasWorkedOutToday ? Color.macroCaloriesText.opacity(0.8) : Color.macroCalories)
-                            .foregroundColor(.white)
-                            .cornerRadius(24)
+                    VStack(spacing: 12) {
+                        Button(action: { toggleWorkout(name: "Main Workout", calories: 250.0) }) {
+                            Text(hasMainWorkout ? "Main Workout ✅ (Tap to Undo)" : "Complete Workout (-250 kcal)")
+                                .font(.headline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(hasMainWorkout ? Color.macroCaloriesText.opacity(0.8) : Color.macroCalories)
+                                .foregroundColor(.white)
+                                .cornerRadius(24)
+                        }
+                        
+                        Button(action: { toggleWorkout(name: "Swings & Climbers", calories: 150.0) }) {
+                            Text(hasSwingsClimbers ? "Swings & Climbers ✅ (Tap to Undo)" : "Swings & Climbers (-150 kcal)")
+                                .font(.headline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(hasSwingsClimbers ? Color.macroCaloriesText.opacity(0.8) : Color(hex: "48cae4"))
+                                .foregroundColor(.white)
+                                .cornerRadius(24)
+                        }
                     }
                     .padding(.horizontal)
                 }
@@ -1223,16 +1186,12 @@ struct CalorieCalculatorView: View {
     }
     
     // NEW: Function to handle both adding and undoing
-    private func toggleWorkout() {
+    private func toggleWorkout(name: String, calories: Double) {
         withAnimation {
-            if hasWorkedOutToday {
-                // Undo: Delete today's workouts
-                for workout in todayWorkouts {
-                    modelContext.delete(workout)
-                }
+            if let existing = todayWorkouts.first(where: { $0.name == name }) {
+                modelContext.delete(existing)
             } else {
-                // Add: Create a new workout for today
-                let entry = WorkoutEntry(timestamp: Date(), caloriesBurned: 250.0)
+                let entry = WorkoutEntry(timestamp: Date(), name: name, caloriesBurned: calories)
                 modelContext.insert(entry)
             }
             try? modelContext.save()

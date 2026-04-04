@@ -262,6 +262,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "needs camera access to scan nutrition labels";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Needs access to display steps";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Needs access to track activity";
+				INFOPLIST_KEY_NSMotionUsageDescription = "MacroTracker needs access to your motion data to show your live step count";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -300,6 +301,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "needs camera access to scan nutrition labels";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Needs access to display steps";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Needs access to track activity";
+				INFOPLIST_KEY_NSMotionUsageDescription = "MacroTracker needs access to your motion data to show your live step count";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

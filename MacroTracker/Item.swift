@@ -41,11 +41,12 @@ final class FoodItem {
     var fatPer100g: Double
     var fiberPer100g: Double
     var caloriesPer100g: Double
-    var unitName: String
-    var unitWeightGrams: Double
-    var dailyGoalAmount: Double = 0.0
     
-    init(name: String, proteinPer100g: Double, carbsPer100g: Double, fatPer100g: Double, fiberPer100g: Double, caloriesPer100g: Double, unitName: String = "100g", unitWeightGrams: Double = 100.0, dailyGoalAmount: Double = 0.0) {
+    var unitName: String = ""
+    var unitWeight: Double = 100.0
+    var dailyGoal: Double?
+    
+    init(name: String, proteinPer100g: Double, carbsPer100g: Double, fatPer100g: Double, fiberPer100g: Double, caloriesPer100g: Double, unitName: String = "", unitWeight: Double = 100.0, dailyGoal: Double? = nil) {
         self.name = name
         self.proteinPer100g = proteinPer100g
         self.carbsPer100g = carbsPer100g
@@ -53,8 +54,8 @@ final class FoodItem {
         self.fiberPer100g = fiberPer100g
         self.caloriesPer100g = caloriesPer100g
         self.unitName = unitName
-        self.unitWeightGrams = unitWeightGrams
-        self.dailyGoalAmount = dailyGoalAmount
+        self.unitWeight = unitWeight
+        self.dailyGoal = dailyGoal
     }
 }
 
@@ -109,50 +110,75 @@ final class DailyHistory {
 @Model
 final class WorkoutEntry {
     var timestamp: Date
+    var name: String
     var caloriesBurned: Double
     
-    init(timestamp: Date = Date(), caloriesBurned: Double = 250.0) {
+    init(timestamp: Date = Date(), name: String = "Main Workout", caloriesBurned: Double = 250.0) {
         self.timestamp = timestamp
+        self.name = name
         self.caloriesBurned = caloriesBurned
     }
 }
 
-// MARK: - Database Seeder Logic (Updated Table)
-// MARK: - Database Seeder Logic (Final Corrected Values)
+// MARK: - Smart Database Sync Logic
+
 struct DatabaseSeeder {
     @MainActor
     static func seed(context: ModelContext) {
-        // בודק אם הרשימה ריקה כדי למנוע כפילויות בכל הרצה
+        // 1. Fetch current items in storage
         let descriptor = FetchDescriptor<FoodItem>()
-        if let existing = try? context.fetch(descriptor), existing.isEmpty {
-            let menu = [
-                FoodItem(name: "טחינה מלאה", proteinPer100g: 22.0, carbsPer100g: 3.0, fatPer100g: 56.0, fiberPer100g: 15.0, caloriesPer100g: 631.0, unitName: "כף", unitWeightGrams: 15.0, dailyGoalAmount: 3.0),
+        let existingItems = (try? context.fetch(descriptor)) ?? []
+        
+        // 2. Define the target menu from your latest spreadsheet (16 items)
+        let latestMenu = [
+            FoodItem(name: "טחינה מלאה", proteinPer100g: 22.0, carbsPer100g: 3.0, fatPer100g: 56.0, fiberPer100g: 15.0, caloriesPer100g: 631.0, unitName: "כף", unitWeight: 15.0),
+            FoodItem(name: "גבינה צהובה", proteinPer100g: 30.0, carbsPer100g: 0.2, fatPer100g: 9.0, fiberPer100g: 0.0, caloriesPer100g: 202.0, unitName: "פרוסה", unitWeight: 30.0, dailyGoal: 5.0),
+            FoodItem(name: "בשר/דג", proteinPer100g: 22.0, carbsPer100g: 0.0, fatPer100g: 4.28, fiberPer100g: 0.0, caloriesPer100g: 200.0),
+            FoodItem(name: "לחם פרו", proteinPer100g: 28.0, carbsPer100g: 13.0, fatPer100g: 3.4, fiberPer100g: 12.3, caloriesPer100g: 220.0, unitName: "פרוסה", unitWeight: 30.0),
+            FoodItem(name: "ביצה קשה", proteinPer100g: 7.0, carbsPer100g: 0.65, fatPer100g: 6.1, fiberPer100g: 0.0, caloriesPer100g: 90.0, unitName: "יחידה", unitWeight: 50.0),
+            FoodItem(name: "הרינג", proteinPer100g: 14.0, carbsPer100g: 0.0, fatPer100g: 12.0, fiberPer100g: 0.0, caloriesPer100g: 170.0),
+            FoodItem(name: "פירות יער קפואים", proteinPer100g: 1.3, carbsPer100g: 5.0, fatPer100g: 0.0, fiberPer100g: 3.8, caloriesPer100g: 45.0, unitName: "גביע", unitWeight: 100.0),
+            FoodItem(name: "שעועית ירוקה", proteinPer100g: 2.1, carbsPer100g: 7.0, fatPer100g: 0.0, fiberPer100g: 3.0, caloriesPer100g: 34.0),
+            FoodItem(name: "פרי", proteinPer100g: 0.0, carbsPer100g: 25.0, fatPer100g: 0.0, fiberPer100g: 4.0, caloriesPer100g: 100.0, unitName: "יחידה", unitWeight: 150.0),
+            FoodItem(name: "אבוקדו", proteinPer100g: 2.0, carbsPer100g: 8.5, fatPer100g: 14.5, fiberPer100g: 6.7, caloriesPer100g: 160.0),
+            FoodItem(name: "אפונה קפואה", proteinPer100g: 5.7, carbsPer100g: 7.0, fatPer100g: 0.0, fiberPer100g: 5.0, caloriesPer100g: 71.0),
+            FoodItem(name: "פסטרמה", proteinPer100g: 15.0, carbsPer100g: 6.0, fatPer100g: 3.0, fiberPer100g: 0.0, caloriesPer100g: 111.0, unitName: "פרוסה", unitWeight: 20.0),
+            FoodItem(name: "בטטה", proteinPer100g: 2.0, carbsPer100g: 21.0, fatPer100g: 0.0, fiberPer100g: 3.3, caloriesPer100g: 90.0),
+            FoodItem(name: "אורז", proteinPer100g: 3.0, carbsPer100g: 26.0, fatPer100g: 0.0, fiberPer100g: 0.0, caloriesPer100g: 120.0),
+            FoodItem(name: "אגוזים", proteinPer100g: 15.0, carbsPer100g: 14.0, fatPer100g: 65.0, fiberPer100g: 6.7, caloriesPer100g: 654.0),
+            FoodItem(name: "חטיף חלבון", proteinPer100g: 20.0, carbsPer100g: 3.0, fatPer100g: 4.5, fiberPer100g: 1.0, caloriesPer100g: 140.0, unitName: "חטיף", unitWeight: 60.0)
+        ]
+        
+        // 3. Sync Logic: Update existing or Insert new
+        for newItem in latestMenu {
+            if let existing = existingItems.first(where: { $0.name == newItem.name }) {
+                // Update nutrition values
+                existing.proteinPer100g = newItem.proteinPer100g
+                existing.carbsPer100g = newItem.carbsPer100g
+                existing.fatPer100g = newItem.fatPer100g
+                existing.fiberPer100g = newItem.fiberPer100g
+                existing.caloriesPer100g = newItem.caloriesPer100g
                 
-                FoodItem(name: "גבינה צהובה", proteinPer100g: 30.0, carbsPer100g: 0.2, fatPer100g: 9.0, fiberPer100g: 0.0, caloriesPer100g: 202.0, unitName: "פרוסה", unitWeightGrams: 30.0, dailyGoalAmount: 3.0),
-                
-                FoodItem(name: "שייטל (בקר)", proteinPer100g: 22.0, carbsPer100g: 0.0, fatPer100g: 4.2, fiberPer100g: 0.0, caloriesPer100g: 200.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 2.0),
-                
-                FoodItem(name: "כבד עוף", proteinPer100g: 25.0, carbsPer100g: 0.9, fatPer100g: 6.5, fiberPer100g: 0.0, caloriesPer100g: 170.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 1.5),
-                
-                FoodItem(name: "ביצה קשה", proteinPer100g: 12.5, carbsPer100g: 1.12, fatPer100g: 10.6, fiberPer100g: 0.0, caloriesPer100g: 155.0, unitName: "ביצה", unitWeightGrams: 70.0, dailyGoalAmount: 3.0),
-                
-                FoodItem(name: "שעועית ירוקה", proteinPer100g: 2.0, carbsPer100g: 1.0, fatPer100g: 0.5, fiberPer100g: 2.2, caloriesPer100g: 29.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 5.0),
-                
-                FoodItem(name: "פירות יער קפואים", proteinPer100g: 1.3, carbsPer100g: 3.8, fatPer100g: 0.0, fiberPer100g: 3.8, caloriesPer100g: 45.0, unitName: "100גר", unitWeightGrams: 100.0, dailyGoalAmount: 2.0),
-                
-                FoodItem(name: "שמן זית", proteinPer100g: 0.0, carbsPer100g: 0.0, fatPer100g: 100.0, fiberPer100g: 0.0, caloriesPer100g: 1000.0, unitName: "כף", unitWeightGrams: 10.0, dailyGoalAmount: 2.0)
-            ]
-            
-            for item in menu {
-                context.insert(item)
+                // Allow sync to override units
+                if existing.unitName.isEmpty && !newItem.unitName.isEmpty {
+                    existing.unitName = newItem.unitName
+                    existing.unitWeight = newItem.unitWeight
+                }
+                if existing.dailyGoal == nil {
+                    existing.dailyGoal = newItem.dailyGoal
+                }
+            } else {
+                // Item doesn't exist, insert it
+                context.insert(newItem)
             }
-            
-            do {
-                try context.save()
-                print("✅ Database successfully seeded with Adrian's custom menu.")
-            } catch {
-                print("❌ Failed to seed database: \(error.localizedDescription)")
-            }
+        }
+        
+        // 4. Save changes
+        do {
+            try context.save()
+            print("✅ Database successfully synced with all 16 food items from the menu.")
+        } catch {
+            print("❌ Failed to sync database: \(error.localizedDescription)")
         }
     }
 }

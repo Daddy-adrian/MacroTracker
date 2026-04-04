@@ -2,34 +2,27 @@ import SwiftUI
 import Foundation
 internal import Combine
 import HealthKit
+import CoreMotion // <-- NEW: Apple's hardware motion framework
 
 class HealthManager: ObservableObject {
     let healthStore = HKHealthStore()
+    let pedometer = CMPedometer() // <-- NEW: Reads the iPhone's hardware directly
     
     @Published var dailySteps: Double = 0
     @Published var dailyActiveCalories: Double = 0
     
     init() {
-        // Automatically request authorization exactly when the manager is first initialized by the SwiftUI view wrapper
         requestAuthorization()
     }
     
     func requestAuthorization() {
+        // We only need HealthKit for calories now, steps are handled by the hardware
         guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard let calorieType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return }
         
-        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount),
-              let calorieType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else {
-            return
-        }
-        
-        let typesToRead: Set = [stepType, calorieType]
-        
-        healthStore.requestAuthorization(toShare: nil, read: typesToRead) { success, error in
+        healthStore.requestAuthorization(toShare: nil, read: [calorieType]) { success, _ in
             if success {
-                // 1. Fetch immediately on success
                 self.fetchTodayData()
-                
-                // 2. Set up the observers to keep data live
                 self.setupBackgroundObserver()
             }
         }
@@ -37,69 +30,63 @@ class HealthManager: ObservableObject {
     
     // MARK: - Live Data Observers
     private func setupBackgroundObserver() {
-        guard let stepType = HKObjectType.quantityType(forIdentifier: .stepCount),
-              let calorieType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else { return }
+        // 1. Keep HealthKit observer for Calories
+        guard let calorieType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else { return }
         
-        // Enable Background Delivery (Tells iOS to wake the app up if there's new data)
-        healthStore.enableBackgroundDelivery(for: stepType, frequency: .hourly) { _, _ in }
         healthStore.enableBackgroundDelivery(for: calorieType, frequency: .hourly) { _, _ in }
-        
-        // Set up the Observer Query for Steps
-        let stepObserver = HKObserverQuery(sampleType: stepType, predicate: nil) { [weak self] _, completionHandler, error in
-            if error == nil {
-                // New data found! Fetch the latest numbers
-                DispatchQueue.main.async {
-                    self?.fetchTodayData()
-                }
-            }
-            // Required: Tell HealthKit we are done processing the background event
-            completionHandler()
-        }
-        
-        // Set up the Observer Query for Calories
         let calorieObserver = HKObserverQuery(sampleType: calorieType, predicate: nil) { [weak self] _, completionHandler, error in
             if error == nil {
-                DispatchQueue.main.async {
-                    self?.fetchTodayData()
-                }
+                DispatchQueue.main.async { self?.fetchTodayData() }
             }
             completionHandler()
         }
-        
-        // Execute the listeners
-        healthStore.execute(stepObserver)
         healthStore.execute(calorieObserver)
+        
+        // 2. NEW: Start live hardware step tracking
+        startLiveStepTracking()
     }
     
     // MARK: - Fetch Logic
     func fetchTodayData() {
-        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount),
-              let calorieType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else {
-            return
-        }
-        
         let calendar = Calendar.current
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
-        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
         
-        // Fetch Steps
-        let stepQuery = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-            guard let result = result, let sum = result.sumQuantity() else { return }
-            DispatchQueue.main.async {
-                self.dailySteps = sum.doubleValue(for: HKUnit.count())
+        // 1. Fetch Calories from HealthKit
+        if let calorieType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+            let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
+            let calorieQuery = HKStatisticsQuery(quantityType: calorieType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                guard let result = result, let sum = result.sumQuantity() else { return }
+                DispatchQueue.main.async {
+                    self.dailyActiveCalories = sum.doubleValue(for: HKUnit.kilocalorie())
+                }
             }
+            healthStore.execute(calorieQuery)
         }
         
-        // Fetch Calories
-        let calorieQuery = HKStatisticsQuery(quantityType: calorieType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-            guard let result = result, let sum = result.sumQuantity() else { return }
-            DispatchQueue.main.async {
-                self.dailyActiveCalories = sum.doubleValue(for: HKUnit.kilocalorie())
+        // 2. Fetch Steps instantly from iPhone Hardware (Bypasses HealthKit delays)
+        if CMPedometer.isStepCountingAvailable() {
+            pedometer.queryPedometerData(from: startOfDay, to: now) { data, error in
+                if let data = data, error == nil {
+                    DispatchQueue.main.async {
+                        self.dailySteps = data.numberOfSteps.doubleValue
+                    }
+                }
             }
         }
-        
-        healthStore.execute(stepQuery)
-        healthStore.execute(calorieQuery)
+    }
+    
+    private func startLiveStepTracking() {
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+        if CMPedometer.isStepCountingAvailable() {
+            // This listens to your steps in real-time while the app is open
+            pedometer.startUpdates(from: startOfDay) { data, error in
+                if let data = data, error == nil {
+                    DispatchQueue.main.async {
+                        self.dailySteps = data.numberOfSteps.doubleValue
+                    }
+                }
+            }
+        }
     }
 }

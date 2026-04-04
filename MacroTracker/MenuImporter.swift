@@ -55,7 +55,7 @@ struct ImportMenuButton: View {
             
             for row in rows.dropFirst() {
                 let columns = row.components(separatedBy: ",")
-                guard columns.count >= 9 else { continue }
+                guard columns.count >= 6 else { continue }
                 
                 // We "Decode" the strings here to handle the \u1495 issue
                 let name = decodeUnicode(columns[0])
@@ -66,9 +66,6 @@ struct ImportMenuButton: View {
                 let fib = Double(decodeUnicode(columns[3])) ?? 0
                 let fats = Double(decodeUnicode(columns[4])) ?? 0
                 let carbs = Double(decodeUnicode(columns[5])) ?? 0
-                let unitName = decodeUnicode(columns[6])
-                let unitWeight = Double(decodeUnicode(columns[7])) ?? 100
-                let dailyGoal = Double(decodeUnicode(columns[8])) ?? 0
                 
                 let newFood = FoodItem(
                     name: name,
@@ -76,10 +73,7 @@ struct ImportMenuButton: View {
                     carbsPer100g: carbs,
                     fatPer100g: fats,
                     fiberPer100g: fib,
-                    caloriesPer100g: cals,
-                    unitName: unitName.isEmpty ? "100g" : unitName,
-                    unitWeightGrams: unitWeight <= 0 ? 100 : unitWeight,
-                    dailyGoalAmount: dailyGoal
+                    caloriesPer100g: cals
                 )
                 
                 modelContext.insert(newFood)
