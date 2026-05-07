@@ -2,6 +2,7 @@
 //  ContentView.swift
 //  MacroTracker
 //
+//
 
 import SwiftUI
 import SwiftData
@@ -169,6 +170,7 @@ struct SettingsWrapperView: View {
             try modelContext.delete(model: DailyEntry.self)
             try modelContext.delete(model: DailyHistory.self)
             try modelContext.delete(model: WorkoutEntry.self)
+            try modelContext.delete(model: BodyMetricsLog.self)
             try modelContext.save()
         } catch {}
     }
@@ -179,9 +181,12 @@ struct SetupView: View {
     @Environment(\.modelContext) private var modelContext
     var existingProfile: UserProfile?
     
+    @Query(sort: \BodyMetricsLog.date, order: .reverse) private var metricsLogs: [BodyMetricsLog]
+    
     @State private var weightStr = ""
     @State private var heightStr = ""
     @State private var ageStr = ""
+    @State private var waistStr = ""
     @State private var isMale = true
     
     @State private var goal = "Maintain"
@@ -204,6 +209,10 @@ struct SetupView: View {
     @State private var usualWorkoutTime = Calendar.current.date(bySettingHour: 20, minute: 0, second: 0, of: Date()) ?? Date()
     
     var weight: Double { Double(weightStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
+    var waist: Double? {
+        let val = Double(waistStr.replacingOccurrences(of: ",", with: "."))
+        return val != nil && val! > 0 ? val : nil
+    }
     var height: Double { Double(heightStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
     var age: Int { Int(ageStr) ?? 0 }
     
@@ -266,6 +275,7 @@ struct SetupView: View {
                 .pickerStyle(SegmentedPickerStyle())
                 
                 TextField("Weight (kg)", text: $weightStr).keyboardType(.decimalPad)
+                TextField("Waist (cm)", text: $waistStr).keyboardType(.decimalPad)
                 TextField("Height (cm)", text: $heightStr).keyboardType(.decimalPad)
                 TextField("Age", text: $ageStr).keyboardType(.numberPad)
             }
@@ -346,6 +356,9 @@ struct SetupView: View {
                 }
                 .listRowBackground(Color.pastelCard)
                 
+                
+
+                
                 Button(action: {
                     saveProfile()
                     if existingProfile != nil { showingSavedAlert = true }
@@ -363,6 +376,46 @@ struct SetupView: View {
                     Button("OK", role: .cancel) { }
                 }
             }
+            
+            if !metricsLogs.isEmpty {
+                Section(header: Text("📈 Progress History")) {
+                    ForEach(metricsLogs) { log in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(log.date, style: .date)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(Color.pastelText)
+                                Spacer()
+                                Image(systemName: "calendar")
+                                    .font(.caption)
+                                    .foregroundColor(Color.pastelTextMuted)
+                            }
+                            
+                            HStack(spacing: 15) {
+                                Label {
+                                    Text("\(log.weightKg, specifier: "%.1f") kg")
+                                        .font(.system(.body, design: .rounded))
+                                } icon: {
+                                    Image(systemName: "scalemass.fill")
+                                        .foregroundColor(Color.macroProteinText)
+                                }
+                                
+                                if let w = log.waistCm, w > 0 {
+                                    Label {
+                                        Text("\(w, specifier: "%.1f") cm")
+                                            .font(.system(.body, design: .rounded))
+                                    } icon: {
+                                        Image(systemName: "ruler.fill")
+                                            .foregroundColor(Color.macroCaloriesText)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .listRowBackground(Color.pastelCard)
+            }
         }
         .scrollContentBackground(.hidden)
         .background(Color.pastelBackground.edgesIgnoringSafeArea(.all))
@@ -371,6 +424,7 @@ struct SetupView: View {
     private func loadExisting() {
         if let profile = existingProfile {
             weightStr = String(format: "%.1f", profile.weightKg)
+            if let w = profile.waistCm { waistStr = String(format: "%.1f", w) }
             heightStr = String(format: "%.1f", profile.heightCm)
             ageStr = "\(profile.age)"
             isMale = profile.isMale
@@ -390,8 +444,10 @@ struct SetupView: View {
     }
     
     private func saveProfile() {
+        let finalWaist = waist
         if let profile = existingProfile {
             profile.weightKg = weight
+            profile.waistCm = finalWaist
             profile.heightCm = height
             profile.age = age
             profile.isMale = isMale
@@ -412,10 +468,15 @@ struct SetupView: View {
                 targetCalories: displayCalories,
                 targetProtein: displayProtein,
                 smartNotificationsEnabled: smartNotificationsEnabled,
-                usualWorkoutTime: usualWorkoutTime
+                usualWorkoutTime: usualWorkoutTime,
+                waistCm: finalWaist
             )
             modelContext.insert(profile)
         }
+        
+        let log = BodyMetricsLog(date: Date(), weightKg: weight, waistCm: finalWaist)
+        modelContext.insert(log)
+        
         try? modelContext.save()
     }
 }
@@ -685,12 +746,17 @@ struct HomeView: View {
     var hasAdHoc: Bool { todayEntries.contains { $0.isAdHoc } }
     
     var activeGoalFoods: [FoodItem] {
-        foodDatabase.filter { food in
+        let filtered = foodDatabase.filter { food in
             if let goal = food.dailyGoal, goal > 0 {
                 let units = unitsConsumed(for: food)
                 return units < Double(goal)
             }
             return false
+        }
+        return filtered.sorted { 
+            if $0.name == "Omega 3 & Creatine" { return false }
+            if $1.name == "Omega 3 & Creatine" { return true }
+            return $0.name < $1.name
         }
     }
     
@@ -793,7 +859,7 @@ struct HomeView: View {
                             VStack {
                                 TextField("Food Name (Temporary)", text: $adHocName)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                                HStack {
+                                hunk {
                                     TextField("Calories", text: $adHocCaloriesStr).keyboardType(.decimalPad)
                                         .textFieldStyle(RoundedBorderTextFieldStyle())
                                     TextField("Protein (g)", text: $adHocProteinStr).keyboardType(.decimalPad)
@@ -1114,10 +1180,6 @@ struct CalorieCalculatorView: View {
         todayWorkouts.contains { $0.name == "Main Workout" }
     }
     
-    var hasSwingsClimbers: Bool {
-        todayWorkouts.contains { $0.name == "Swings & Climbers" }
-    }
-    
     var consumedCalories: Double { todayEntries.reduce(0) { $0 + $1.calories } }
     var sedentaryBurned: Double { -(profile.bmr * 1.2) }
     var stepsBurned: Double { -(healthManager.dailySteps * 0.04) }
@@ -1160,16 +1222,6 @@ struct CalorieCalculatorView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(hasMainWorkout ? Color.macroCaloriesText.opacity(0.8) : Color.macroCalories)
-                                .foregroundColor(.white)
-                                .cornerRadius(24)
-                        }
-                        
-                        Button(action: { toggleWorkout(name: "Swings & Climbers", calories: 150.0) }) {
-                            Text(hasSwingsClimbers ? "Swings & Climbers ✅ (Tap to Undo)" : "Swings & Climbers (-150 kcal)")
-                                .font(.headline.bold())
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(hasSwingsClimbers ? Color.macroCaloriesText.opacity(0.8) : Color(hex: "48cae4"))
                                 .foregroundColor(.white)
                                 .cornerRadius(24)
                         }

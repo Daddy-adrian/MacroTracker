@@ -2,6 +2,7 @@
 //  MacroTrackerApp.swift
 //  MacroTracker
 //
+//
 
 import SwiftUI
 import SwiftData
@@ -14,7 +15,8 @@ struct MacroTrackerApp: App {
             FoodItem.self,
             DailyEntry.self,
             DailyHistory.self,
-            WorkoutEntry.self
+            WorkoutEntry.self,
+            BodyMetricsLog.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
