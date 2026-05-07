@@ -183,10 +183,10 @@ struct SetupView: View {
     
     @Query(sort: \BodyMetricsLog.date, order: .reverse) private var metricsLogs: [BodyMetricsLog]
     
-    @State private var weightStr = ""
-    @State private var heightStr = ""
-    @State private var ageStr = ""
-    @State private var waistStr = ""
+    @State private var weightStr = "67.0"
+    @State private var heightStr = "172.0"
+    @State private var ageStr = "28"
+    @State private var waistStr = "87.0"
     @State private var isMale = true
     
     @State private var goal = "Maintain"
@@ -200,9 +200,9 @@ struct SetupView: View {
         ("Very Active", 1.725)
     ]
     
-    @State private var manualCalories: Double = 0
-    @State private var manualProtein: Double = 0
-    @State private var hasEditedSliders = false
+    @State private var manualCaloriesStr = ""
+    @State private var manualProteinStr = ""
+    @State private var hasEditedTargets = false
     @State private var showingSavedAlert = false
     
     @State private var smartNotificationsEnabled = false
@@ -245,11 +245,17 @@ struct SetupView: View {
     }
     
     var displayCalories: Double {
-        hasEditedSliders ? manualCalories : max(defaultCalories, bmr)
+        if hasEditedTargets, let val = Double(manualCaloriesStr.replacingOccurrences(of: ",", with: ".")) {
+            return val
+        }
+        return max(defaultCalories, bmr)
     }
     
     var displayProtein: Double {
-        hasEditedSliders ? manualProtein : max(defaultProtein, minimumProtein)
+        if hasEditedTargets, let val = Double(manualProteinStr.replacingOccurrences(of: ",", with: ".")) {
+            return val
+        }
+        return max(defaultProtein, minimumProtein)
     }
     
     var isFormValid: Bool { weight > 0 && height > 0 && age > 0 }
@@ -318,47 +324,30 @@ struct SetupView: View {
                 }
                 .listRowBackground(Color.pastelCard)
                 
-                Section(header: Text("Daily Targets"), footer: Text("Adjust your targets. Manual tweaks are saved until you reset them.")) {
-                    VStack(alignment: .leading) {
-                        Text("Calories: \(Int(displayCalories)) kcal")
-                        Slider(
-                            value: Binding(
-                                get: { self.displayCalories },
-                                set: { newValue in
-                                    if !self.hasEditedSliders {
-                                        self.manualProtein = self.displayProtein
-                                    }
-                                    self.manualCalories = newValue
-                                    self.hasEditedSliders = true
-                                }
-                            ),
-                            in: bmr...max(bmr + 1, 5000),
-                            step: 10
-                        )
+                Section(header: Text("Daily Targets"), footer: Text("Manual tweaks are saved until you reset them.")) {
+                    HStack {
+                        Text("Calories (kcal)")
+                        Spacer()
+                        TextField("\(Int(max(defaultCalories, bmr)))", text: $manualCaloriesStr)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: manualCaloriesStr) { hasEditedTargets = true }
                     }
                     
-                    VStack(alignment: .leading) {
-                        Text("Protein: \(Int(displayProtein)) g")
-                        Slider(
-                            value: Binding(
-                                get: { self.displayProtein },
-                                set: { newValue in
-                                    if !self.hasEditedSliders {
-                                        self.manualCalories = self.displayCalories
-                                    }
-                                    self.manualProtein = newValue
-                                    self.hasEditedSliders = true
-                                }
-                            ),
-                            in: minimumProtein...max(minimumProtein + 1, 400),
-                            step: 1
-                        )
+                    HStack {
+                        Text("Protein (g)")
+                        Spacer()
+                        TextField("\(Int(max(defaultProtein, minimumProtein)))", text: $manualProteinStr)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: manualProteinStr) { hasEditedTargets = true }
                     }
                     
-                    // Allow the user to reset to BMR calculations if they want
-                    if hasEditedSliders {
+                    if hasEditedTargets {
                         Button("Reset to Recommended") {
-                            hasEditedSliders = false
+                            manualCaloriesStr = ""
+                            manualProteinStr = ""
+                            hasEditedTargets = false
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
@@ -440,10 +429,10 @@ struct SetupView: View {
             goal = profile.goal
             activityLevel = profile.activityLevel
             
-            // Set sliders to saved state and lock them there
-            manualCalories = profile.targetCalories
-            manualProtein = profile.targetProtein
-            hasEditedSliders = true
+            // Set inputs to saved state
+            manualCaloriesStr = String(format: "%.0f", profile.targetCalories)
+            manualProteinStr = String(format: "%.0f", profile.targetProtein)
+            hasEditedTargets = true
             
             smartNotificationsEnabled = profile.smartNotificationsEnabled
             if let wTime = profile.usualWorkoutTime {
@@ -473,9 +462,9 @@ struct SetupView: View {
         let cloudCals = store.double(forKey: "bk_targetCalories")
         let cloudProt = store.double(forKey: "bk_targetProtein")
         if cloudCals > 0 && cloudProt > 0 {
-            manualCalories = cloudCals
-            manualProtein = cloudProt
-            hasEditedSliders = true
+            manualCaloriesStr = String(format: "%.0f", cloudCals)
+            manualProteinStr = String(format: "%.0f", cloudProt)
+            hasEditedTargets = true
         }
     }
     
@@ -728,7 +717,7 @@ struct GoalTrackerRow: View {
     }
     
     private func logManualUnits() {
-        let cleanInputStr = inputStr.replacingOccurrences(of: ",", with: ".")
+        let cleanInputStr = inputStr.replacingOccurrences(of: ",", with: "." registry: .localized)
         let unitsToLog = Double(cleanInputStr) ?? 1.0
         
         let targetUnitWeight = max(1.0, food.unitWeight)
